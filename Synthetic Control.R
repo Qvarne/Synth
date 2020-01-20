@@ -11,8 +11,13 @@ library(MSCMT)
 library(gsynth)
 library(MatchIt)
 library(purrr)
+library(fastDummies)
+library(sjmisc)
+library(pwt9)
+library(gghighlight)
 
-version# Load data from Eurostat (NUTS 3)
+# version
+# Load data from Eurostat (NUTS 3)
 data <- get_eurostat(id = "demo_r_d3dens", time_format = "num") %>%
   rename(population.density = values) %>%
   left_join(get_eurostat(id = "nama_10r_3gdp", time_format = "num", filters = list(unit = "MIO_EUR")), by = c("geo","time")) %>%
@@ -137,16 +142,25 @@ data <- get_eurostat(id = "demo_r_d3dens", time_format = "num") %>%
   left_join(get_eurostat(id = "bd_hgnace2_r3", time_format = "num", filters = list(indic_sb = "V11910", nace_r2 = "R_S")), 
             by = c("geo","time")) %>% rename(business.R_S  = values)
   
-  # Drop unit identifiers
-  data <- data %>% mutate(country = substr(geo,1,2)) %>% mutate(nuts.2 = substr(geo,1,4)) %>% 
+# Drop unit identifiers
+
+data <- data %>% mutate(country = substr(geo,1,2)) %>% mutate(nuts.2 = substr(geo,1,4)) %>% 
     select(-c(grep("unit", colnames(data)), grep("wstatus", colnames(data)), 
-           grep("nace_r2", colnames(data)), grep("currency", colnames(data)), grep("indic_sb", colnames(data)))) %>% select(-"landuse") 
+           grep("nace_r2", colnames(data)), grep("currency", colnames(data)), grep("indic_sb", colnames(data)))) %>% select(-"landuse")
+data <- data %>% to_dummy(country, suffix = "label") %>% bind_cols(data) 
   
   # Load data from Eurostat (Country)
-  data <- data %>% left_join(get_eurostat(id = "nama_10_gdp", time_format = "num", filters = list(na_item = "B1GQ", unit = "CP_MEUR")), 
-              by = c("country" = "geo","time")) %>%
-    rename(gdp_country = values) %>% select(-c("unit","na_item")) %>% mutate(nuts2 = substr(geo,1,4)) %>% 
+  data <- data %>% left_join(get_eurostat(id = "nama_10_gdp", time_format = "num", filters = list(na_item = "B1GQ", unit = "CP_MEUR")) %>% 
+            bind_cols(get_eurostat(id = "nama_10_gdp", time_format = "num", filters = list(na_item = "B1GQ", unit = "CP_MEUR"), type = "label")) %>% 
+            select(-c("unit1","na_item1","time1","values1")) %>% rename(country.name = geo1), 
+              by = c("country" = "geo","time")) %>% rename(gdp_country = values) %>% select(-c("unit","na_item")) %>% 
     mutate(gdp_share = gdp.MIO_EUR/gdp_country)
+    
+  data$country.name <- recode(data$country.name, "Germany (until 1990 former territory of the FRG)" = "Germany")
+  
+  # Get national TFP data from Penn World Tables
+  data <- data %>% left_join(pwt9.1[ ,c("country","year","ctfp")], by = c("country.name" = "country","time" = "year"))
+  
   
   # Load data from Eurostat (NUTS 2)
   data <- data %>% left_join(get_eurostat(id = "htec_emp_reg2", time_format = "num", filters = list(nace_r2 = "TOTAL", sex = "T", unit = "THS")), 
@@ -177,10 +191,102 @@ data <- get_eurostat(id = "demo_r_d3dens", time_format = "num") %>%
     left_join(get_eurostat(id = "nama_10r_2gfcf", time_format = "num", filters = list(currency = "MIO_EUR", nace_r2 = "TOTAL")), 
             by = c("nuts.2" = "geo","time")) %>% rename(capital_fixed.TOTAL = values) %>% select(-c("currency","nace_r2")) %>%
     left_join(get_eurostat(id = "edat_lfse_04", time_format = "num", filters = list(age = "Y25-64", isced11 = "ED5-8", sex = "T", unit = "PC")), 
-              by = c("nuts.2" = "geo","time")) %>% rename(tert_ed = values) %>% select(-c("age","isced11","sex","unit"))
-
-
-# Add spatial information
+              by = c("nuts.2" = "geo","time")) %>% rename(tert_ed = values) %>% select(-c("age","isced11","sex","unit")) %>%
+    left_join(get_eurostat(id = "nama_10r_2gdp", time_format = "num", filters = list(unit = "EUR_HAB")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(gdp.EUR_HAB.NUTS.2 = values) %>% select(-c("unit")) %>%
+    left_join(get_eurostat(id = "tgs00102", time_format = "num", filters = list(unit = "PC", sex = "T", age = "Y20-64")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(employment.20_64.NUTS.2 = values) %>% select(-c("unit","sex","age")) %>% 
+    left_join(get_eurostat(id = "demo_r_d2jan", time_format = "num", filters = list(unit = "NR", sex = "T", age = "TOTAL")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(population.NUTS.2 = values) %>% select(-c("unit","sex","age")) %>% 
+    left_join(get_eurostat(id = "tgs00002", time_format = "num", filters = list(unit = "KM2", landuse = "TOTAL")), 
+            by = c("nuts.2" = "geo","time")) %>% rename(area.NUTS.2 = values) %>% select(-c("unit","landuse")) %>%
+    left_join(get_eurostat(id = "nama_10r_2emhrw", time_format = "num", filters = list(unit = "THS", wstatus = "EMP", nace_r2 = "TOTAL")), 
+            by = c("nuts.2" = "geo","time")) %>% rename(hours.worked.TOTAL = values) %>% select(-c("unit","wstatus","nace_r2")) %>%
+    left_join(get_eurostat(id = "nama_10r_2emhrw", time_format = "num", filters = list(unit = "THS", wstatus = "EMP", nace_r2 = "A")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(hours.worked.A = values) %>% select(-c("unit","wstatus","nace_r2")) %>%
+    left_join(get_eurostat(id = "nama_10r_2emhrw", time_format = "num", filters = list(unit = "THS", wstatus = "EMP", nace_r2 = "B-E")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(hours.worked.B_E = values) %>% select(-c("unit","wstatus","nace_r2")) %>%
+    left_join(get_eurostat(id = "nama_10r_2emhrw", time_format = "num", filters = list(unit = "THS", wstatus = "EMP", nace_r2 = "C")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(hours.worked.C = values) %>% select(-c("unit","wstatus","nace_r2")) %>%
+    left_join(get_eurostat(id = "nama_10r_2emhrw", time_format = "num", filters = list(unit = "THS", wstatus = "EMP", nace_r2 = "F")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(hours.worked.F = values) %>% select(-c("unit","wstatus","nace_r2")) %>%
+    left_join(get_eurostat(id = "nama_10r_2emhrw", time_format = "num", filters = list(unit = "THS", wstatus = "EMP", nace_r2 = "G-J")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(hours.worked.G_J = values) %>% select(-c("unit","wstatus","nace_r2")) %>%
+    left_join(get_eurostat(id = "nama_10r_2emhrw", time_format = "num", filters = list(unit = "THS", wstatus = "EMP", nace_r2 = "G-I")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(hours.worked.G_I = values) %>% select(-c("unit","wstatus","nace_r2")) %>%
+    left_join(get_eurostat(id = "nama_10r_2emhrw", time_format = "num", filters = list(unit = "THS", wstatus = "EMP", nace_r2 = "J")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(hours.worked.J = values) %>% select(-c("unit","wstatus","nace_r2")) %>%
+    left_join(get_eurostat(id = "nama_10r_2emhrw", time_format = "num", filters = list(unit = "THS", wstatus = "EMP", nace_r2 = "K-N")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(hours.worked.K_N = values) %>% select(-c("unit","wstatus","nace_r2")) %>%
+    left_join(get_eurostat(id = "nama_10r_2emhrw", time_format = "num", filters = list(unit = "THS", wstatus = "EMP", nace_r2 = "K")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(hours.worked.K = values) %>% select(-c("unit","wstatus","nace_r2")) %>%
+    left_join(get_eurostat(id = "nama_10r_2emhrw", time_format = "num", filters = list(unit = "THS", wstatus = "EMP", nace_r2 = "L")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(hours.worked.L = values) %>% select(-c("unit","wstatus","nace_r2")) %>%
+    left_join(get_eurostat(id = "nama_10r_2emhrw", time_format = "num", filters = list(unit = "THS", wstatus = "EMP", nace_r2 = "M_N")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(hours.worked.M_N = values) %>% select(-c("unit","wstatus","nace_r2")) %>%
+    left_join(get_eurostat(id = "nama_10r_2emhrw", time_format = "num", filters = list(unit = "THS", wstatus = "EMP", nace_r2 = "O-U")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(hours.worked.O_U = values) %>% select(-c("unit","wstatus","nace_r2")) %>%
+    left_join(get_eurostat(id = "nama_10r_2emhrw", time_format = "num", filters = list(unit = "THS", wstatus = "EMP", nace_r2 = "O-Q")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(hours.worked.O_Q = values) %>% select(-c("unit","wstatus","nace_r2")) %>%
+    left_join(get_eurostat(id = "nama_10r_2emhrw", time_format = "num", filters = list(unit = "THS", wstatus = "EMP", nace_r2 = "R-U")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(hours.worked.R_U = values) %>% select(-c("unit","wstatus","nace_r2")) %>%
+    left_join(get_eurostat(id = "lfst_r_lfe2en2", time_format = "num", filters = list(unit = "THS", age = "Y_GE15", nace_r2 = "TOTAL")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(employment.o15.nace2.TOTAL = values) %>% select(-c("unit","age","nace_r2")) %>%
+    left_join(get_eurostat(id = "lfst_r_lfe2en2", time_format = "num", filters = list(unit = "THS", age = "Y_GE15", nace_r2 = "A")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(employment.o15.nace2.A = values) %>% select(-c("unit","age","nace_r2")) %>%
+    left_join(get_eurostat(id = "lfst_r_lfe2en2", time_format = "num", filters = list(unit = "THS", age = "Y_GE15", nace_r2 = "B-E")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(employment.o15.nace2.B_E = values) %>% select(-c("unit","age","nace_r2")) %>%
+    left_join(get_eurostat(id = "lfst_r_lfe2en2", time_format = "num", filters = list(unit = "THS", age = "Y_GE15", nace_r2 = "F")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(employment.o15.nace2.F = values) %>% select(-c("unit","age","nace_r2")) %>%
+    left_join(get_eurostat(id = "lfst_r_lfe2en2", time_format = "num", filters = list(unit = "THS", age = "Y_GE15", nace_r2 = "G-I")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(employment.o15.nace2.G_I = values) %>% select(-c("unit","age","nace_r2")) %>%
+    left_join(get_eurostat(id = "lfst_r_lfe2en2", time_format = "num", filters = list(unit = "THS", age = "Y_GE15", nace_r2 = "J")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(employment.o15.nace2.J = values) %>% select(-c("unit","age","nace_r2")) %>%
+    left_join(get_eurostat(id = "lfst_r_lfe2en2", time_format = "num", filters = list(unit = "THS", age = "Y_GE15", nace_r2 = "K")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(employment.o15.nace2.K = values) %>% select(-c("unit","age","nace_r2")) %>%
+    left_join(get_eurostat(id = "lfst_r_lfe2en2", time_format = "num", filters = list(unit = "THS", age = "Y_GE15", nace_r2 = "L")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(employment.o15.nace2.L = values) %>% select(-c("unit","age","nace_r2")) %>%
+    left_join(get_eurostat(id = "lfst_r_lfe2en2", time_format = "num", filters = list(unit = "THS", age = "Y_GE15", nace_r2 = "M_N")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(employment.o15.nace2.M_N = values) %>% select(-c("unit","age","nace_r2")) %>%
+    left_join(get_eurostat(id = "lfst_r_lfe2en2", time_format = "num", filters = list(unit = "THS", age = "Y_GE15", nace_r2 = "O-Q")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(employment.o15.nace2.O_Q = values) %>% select(-c("unit","age","nace_r2")) %>%
+    left_join(get_eurostat(id = "lfst_r_lfe2en2", time_format = "num", filters = list(unit = "THS", age = "Y_GE15", nace_r2 = "R-U")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(employment.o15.nace2.R_U = values) %>% select(-c("unit","age","nace_r2")) %>%
+    left_join(get_eurostat(id = "lfst_r_lfe2en2", time_format = "num", filters = list(unit = "THS", age = "Y_GE15", nace_r2 = "NRP")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(employment.o15.nace2.NRP = values) %>% select(-c("unit","age","nace_r2")) %>%
+    left_join(get_eurostat(id = "lfst_r_lfe2en1", time_format = "num", filters = list(unit = "THS", age = "Y_GE15", nace_r1 = "TOTAL")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(employment.o15.nace1.TOTAL = values) %>% select(-c("unit","age","nace_r1")) %>%
+    left_join(get_eurostat(id = "lfst_r_lfe2en1", time_format = "num", filters = list(unit = "THS", age = "Y_GE15", nace_r1 = "A_B")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(employment.o15.nace1.A_B = values) %>% select(-c("unit","age","nace_r1")) %>%
+    left_join(get_eurostat(id = "lfst_r_lfe2en1", time_format = "num", filters = list(unit = "THS", age = "Y_GE15", nace_r1 = "C-F")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(employment.o15.nace.1C_F = values) %>% select(-c("unit","age","nace_r1")) %>%
+    left_join(get_eurostat(id = "lfst_r_lfe2en1", time_format = "num", filters = list(unit = "THS", age = "Y_GE15", nace_r1 = "C-E")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(employment.o15.nace.1.C_E = values) %>% select(-c("unit","age","nace_r1")) %>%
+    left_join(get_eurostat(id = "lfst_r_lfe2en1", time_format = "num", filters = list(unit = "THS", age = "Y_GE15", nace_r1 = "F")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(employment.o15.nace1.F = values) %>% select(-c("unit","age","nace_r1")) %>%
+    left_join(get_eurostat(id = "lfst_r_lfe2en1", time_format = "num", filters = list(unit = "THS", age = "Y_GE15", nace_r1 = "G-Q")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(employment.o15.nace1.G_Q = values) %>% select(-c("unit","age","nace_r1")) %>%
+    left_join(get_eurostat(id = "lfst_r_lfe2en1", time_format = "num", filters = list(unit = "THS", age = "Y_GE15", nace_r1 = "G-I")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(employment.o15.nace1.G_I = values) %>% select(-c("unit","age","nace_r1")) %>%
+    left_join(get_eurostat(id = "lfst_r_lfe2en1", time_format = "num", filters = list(unit = "THS", age = "Y_GE15", nace_r1 = "J_K")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(employment.o15.nace1.J_K = values) %>% select(-c("unit","age","nace_r1")) %>%
+    left_join(get_eurostat(id = "lfst_r_lfe2en1", time_format = "num", filters = list(unit = "THS", age = "Y_GE15", nace_r1 = "L-Q")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(employment.o15.nace1.L_Q = values) %>% select(-c("unit","age","nace_r1")) %>%
+    left_join(get_eurostat(id = "lfst_r_lfe2en1", time_format = "num", filters = list(unit = "THS", age = "Y_GE15", nace_r1 = "NRP")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(employment.o15.nace1.NRP = values) %>% select(-c("unit","age","nace_r1")) %>%
+    mutate(employment.o15.TOTAL = ifelse(is.na(employment.o15.nace1.TOTAL),employment.o15.nace2.TOTAL,employment.o15.nace1.TOTAL)) %>% 
+    mutate(employment.o15.F = ifelse(is.na(employment.o15.nace1.F),employment.o15.nace2.F,employment.o15.nace1.F)) %>%        
+    mutate(employment.o15.G_I = ifelse(is.na(employment.o15.nace1.G_I),employment.o15.nace2.G_I,employment.o15.nace1.G_I)) %>%
+    mutate(employment.o15.nace2.J_K = sum(employment.o15.nace2.J,employment.o15.nace2.K,na.rm = T)) %>%
+    mutate(employment.o15.J_K = ifelse(is.na(employment.o15.nace1.J_K),employment.o15.nace2.J_K,employment.o15.nace1.J_K)) %>% 
+    mutate(employment.o15.nace2.L_Q = sum(employment.o15.nace2.L,employment.o15.nace2.M_N,employment.o15.nace2.O_Q,na.rm = T)) %>%
+    mutate(employment.o15.L_Q = ifelse(is.na(employment.o15.nace1.L_Q),employment.o15.nace2.L_Q,employment.o15.nace1.L_Q)) %>% 
+    mutate(employment.o15.NRP = ifelse(is.na(employment.o15.nace1.NRP),employment.o15.nace2.NRP,employment.o15.nace1.NRP)) %>% 
+    left_join(get_eurostat(id = "demo_r_pjanind2", time_format = "num", filters = list(unit = "PC", indic_de = "DEPRATIO1")), 
+              by = c("nuts.2" = "geo","time")) %>% rename(dependency.ratio = values) %>% select(-c("unit","indic_de")) 
+  
+  
+  # Add spatial information
 added <- read.csv("Typologies.csv") %>%
   mutate(Coastal.region = ifelse(Coastal.region == "Y", 1, 0)) %>%
   mutate(Rural...urban.typology = ifelse(Rural...urban.typology == "Urban region" | Rural...urban.typology == "Intermediate region", 1, 0)) %>%
@@ -306,43 +412,65 @@ data2 <- data2 %>% group_by(nuts.2,time) %>% mutate(port.NUTS.2 = ifelse(mean(po
   mutate(gva.TOTAL.NUTS.2 = sum(gva.TOTAL, na.rm = T)) %>% mutate(road_freight.NUTS.2 = sum(road_freight, na.rm = T)) %>% 
   mutate(gva.B_E_F.NUTS.2 = sum(gva.B_E_F, na.rm = T)) %>% mutate(gva.B_E_F_share.NUTS.2 = gva.B_E_F.NUTS.2/gva.TOTAL.NUTS.2) %>% 
   mutate(employment.TOTAL.NUTS.2 = sum(employment.TOTAL, na.rm = T)) %>% mutate(employment_hitec.TOTAL = sum(employment_hitec.TOTAL, na.rm = T)) %>%
-  mutate(employment.TOTAL_capita.NUTS.2 = employment.TOTAL.NUTS.2/population.NUTS.2) %>% mutate(gva.TOTAL_capita.NUTS.2 = gva.TOTAL.NUTS.2/population.NUTS.2)
+  mutate(employment.TOTAL_capita.NUTS.2 = employment.TOTAL.NUTS.2/population.NUTS.2) %>% mutate(gva.TOTAL_capita.NUTS.2 = gva.TOTAL.NUTS.2/population.NUTS.2) %>%
+  mutate(gdp.NUTS.2 = sum(gdp.MIO_EUR, na.rm = T)) %>% mutate(gdp_share.NUTS.2 = gdp.NUTS.2/gdp_country)
  
 
 # Continue on setting up data
 data3 <- data2  %>% mutate(gva.TOTAL_capita = gva.TOTAL*1000/population) %>% 
   mutate(employment.TOTAL_capita = employment.TOTAL/population) %>%
-  mutate(gdp.EUR_HAB = as.numeric(gdp.EUR_HAB)) %>% as.data.table() %>% select(-c("na.rm")) 
-
+  mutate(gdp.EUR_HAB = as.numeric(gdp.EUR_HAB)) %>% as.data.table() %>% select(-c("na.rm")) %>% mutate(employment.TOTAL.NUTS.2.log = log(employment.TOTAL.NUTS.2)) %>%
+  mutate(hours.worked.M_N.share = hours.worked.M_N/hours.worked.TOTAL) %>% mutate(hours.worked.G_I.share = hours.worked.G_I/hours.worked.TOTAL)
 # Create id
 data3$id <- data3 %>% group_by(geo) %>% group_indices()
 data3$id.NUTS.2 <- data3 %>% group_by(nuts.2) %>% group_indices()
 
-data3 %>% filter(geo=="DEA12") %>% select(id.NUTS.2)
+data3 %>% filter(geo == "DE600")
+
+# Reducing sample to obserrvations sharing shock
+# data3 <- data3 %>% left_join(data3 %>% arrange(id.NUTS.2,time) %>%
+#                                select(id.NUTS.2,time,hours.worked.TOTAL) %>%
+#                                group_by(id.NUTS.2) %>%
+#                                mutate(hours.worked.TOTAL_growth = c(NA,diff(hours.worked.TOTAL))/lag(hours.worked.TOTAL, 1)) %>%
+#                                select(-hours.worked.TOTAL),by = c("id.NUTS.2","time"))
+# 
+# data3 %>% group_by(id.NUTS.2) %>% filter(time >= 2011 & time <= 2017) %>% mutate(mean_hours.worked.TOTAL_growth = mean(hours.worked.TOTAL_growth)) %>%
+#   filter(nuts.2 == "DEA1") %>% select(mean_hours.worked.TOTAL_growth)
+# 
+# b <- data3 %>% group_by(id.NUTS.2) %>% filter(time >= 2010 & time <= 2013) %>% mutate(mean_hours.worked.TOTAL_growth = mean(hours.worked.TOTAL_growth)) %>%
+#   filter(mean_hours.worked.TOTAL_growth > 0) %>% filter(time == 2013) %>% select(id.NUTS.2) %>% unlist() %>% unique()
+# 
+# data3 <- data3 %>% select(-hours.worked.TOTAL_growth)
 
 # Preparing data set for synthetic control
-data4 <- data3 %>% filter(country == "DE") %>% filter(time >= 1999 & time < 2018) %>%   
-  distinct(., nuts.2, time, .keep_all= TRUE) %>% group_by(id) %>% 
+data4 <- data3 %>% filter(time >= 2000 & time < 2017) %>% 
+  distinct(id.NUTS.2, time, .keep_all= TRUE) %>% group_by(id.NUTS.2) %>% 
   # mutate(mean_gdp.EUR_HAB = ifelse(time < 2011 & is.na(gdp.EUR_HAB),
   #                             mean(gdp.EUR_HAB, na.rm = TRUE),gdp.EUR_HAB)) %>%
   # mutate(mean_business.B_S_X_K642 = ifelse(time < 2011 & is.na(business.B_S_X_K642),
   #                                  mean(business.B_S_X_K642, na.rm = TRUE),business.B_S_X_K642)) %>%
   mutate(mean_capital_fixed.TOTAL = ifelse(time < 2011 & is.na(capital_fixed.TOTAL),
                                    mean(capital_fixed.TOTAL, na.rm = TRUE),capital_fixed.TOTAL)) %>%
+  mutate(mean_dependency.ratio = ifelse(time < 2011 & is.na(dependency.ratio), 
+                                           mean(dependency.ratio, na.rm = TRUE),dependency.ratio)) %>%
+  mutate(mean_gdp_share.NUTS.2 = ifelse(time < 2011 & is.na(gdp_share.NUTS.2),
+                                           mean(gdp_share.NUTS.2, na.rm = TRUE),gdp_share.NUTS.2)) %>%
   mutate(mean_tert_ed = ifelse(time < 2011 & is.na(tert_ed),
                                    mean(tert_ed, na.rm = TRUE),tert_ed)) %>%
   # mutate(mean_employment.TOTAL_capita = ifelse(time < 2011 & is.na(employment.TOTAL_capita),
-  #                                         mean(employment.TOTAL_capita, na.rm = TRUE),employment.TOTAL_capita)) %>%
-  mutate(mean_employment.TOTAL_capita.NUTS.2 = ifelse(time < 2011 & is.na(employment.TOTAL_capita.NUTS.2),
-                                               mean(employment.TOTAL_capita.NUTS.2, na.rm = TRUE),employment.TOTAL_capita.NUTS.2)) %>%
+                                          # mean(employment.TOTAL_capita, na.rm = TRUE),employment.TOTAL_capita)) %>%
+  # mutate(mean_employment.TOTAL_capita.NUTS.2 = ifelse(time < 2011 & is.na(employment.TOTAL_capita.NUTS.2),
+  #                                              mean(employment.TOTAL_capita.NUTS.2, na.rm = TRUE),employment.TOTAL_capita.NUTS.2)) %>%
   # mutate(mean_gdp_share = ifelse(time < 2011 & is.na(gdp_share),
-  #                                             mean(gdp_share, na.rm = TRUE),gdp_share)) %>%
+                                              # mean(gdp_share, na.rm = TRUE),gdp_share)) %>%
   # mutate(mean_population.density = ifelse(time < 2011 & is.na(population.density),
   #                                     mean(population.density, na.rm = TRUE),population.density)) %>%
   # mutate(mean_gva.B_E_F_share = ifelse(time > 2011 & is.na(gva.B_E_F_share),
-  #                                      mean(gva.B_E_F_share, na.rm = TRUE),gva.B_E_F_share)) %>%
+                                       # mean(gva.B_E_F_share, na.rm = TRUE),gva.B_E_F_share)) %>%
   mutate(mean_gva.B_E_F_share.NUTS.2 = ifelse(time > 2011 & is.na(gva.B_E_F_share.NUTS.2),
                                        mean(gva.B_E_F_share.NUTS.2, na.rm = TRUE),gva.B_E_F_share.NUTS.2)) %>%
+  # mutate(mean_road_freight.NUTS.2 = ifelse(time > 2011 & is.na(road_freight.NUTS.2),
+  #                                             mean(road_freight.NUTS.2, na.rm = TRUE),road_freight.NUTS.2)) %>%
   # mutate(mean_coast = ifelse(is.na(coast),
   #                                     mean(coast, na.rm = TRUE),coast)) %>%
   # mutate(mean_urban = ifelse(is.na(urban),
@@ -354,26 +482,45 @@ data4 <- data3 %>% filter(country == "DE") %>% filter(time >= 1999 & time < 2018
   # filter(!is.na(mean_population.density)) %>% 
   # filter(!is.na(mean_business.B_S_X_K642)) %>% 
   filter(!is.na(mean_capital_fixed.TOTAL)) %>%
+  # filter(!is.na(mean_road_freight.NUTS.2)) %>%
+  filter(!is.na(mean_gdp_share.NUTS.2)) %>%
   filter(!is.na(mean_tert_ed)) %>%
-  filter(!is.na(mean_employment.TOTAL_capita.NUTS.2)) %>%
+  filter(!is.na(mean_dependency.ratio)) %>%
+  # filter(!is.na(mean_employment.TOTAL_capita)) %>%
+  # filter(!is.na(mean_employment.TOTAL_capita.NUTS.2)) %>%
   # filter(!is.na(mean_gdp_share)) %>%
   # filter(!is.na(mean_coast)) %>%
   # filter(!is.na(mean_urban)) %>%
+  # filter(!is.na(mean_gva.B_E_F_share)) %>%
   filter(!is.na(mean_gva.B_E_F_share.NUTS.2)) %>%
   # filter(!is.na(mean_metro)) %>%
-  filter(!is.na(gva.TOTAL_capita.NUTS.2)) %>%
+  # filter(!is.na(gva.TOTAL_capita.NUTS.2)) %>%
+  # filter(!is.na(employment.TOTAL.NUTS.2.log)) %>%
+  # filter(!is.na(maritime_freight)) %>%
   # filter(!is.na(mean_port)) %>%
   # filter(!is.na(mean_gdp.EUR_HAB)) %>%
-  filter(!is.na(id)) %>% filter(!is.na(time)) %>% filter(!is.na(geo)) %>% as.data.frame() %>% 
+  filter(!is.na(id.NUTS.2)) %>%
+  filter(!is.na(hours.worked.G_I)) %>% 
+  # filter(!is.na(id)) %>% 
+  filter(!is.na(nuts.2)) %>% 
+  filter(!is.na(time)) %>% 
+  # filter(!is.na(geo)) %>% 
+  as.data.frame() %>% 
   select(c(
            # "mean_population.density",
            # "mean_urban",
            # "mean_metro",
-           "gva.TOTAL_capita.NUTS.2",
-           "id",
+           # "gva.TOTAL_capita.NUTS.2",
+           # "employment.TOTAL.NUTS.2.log",
+           # "hours.worked.G_I",
+           "mean_dependency.ratio",
+           "hours.worked.G_I", 
+           # "employment.TOTAL.NUTS.2",
+           # "id",
            "id.NUTS.2",
+           # "mean_road_freight.NUTS.2",
            "time",
-           "geo",
+           # "geo",
            # "country",
            "nuts.2",
            # "mean_gva.B_E_F_share",
@@ -382,23 +529,36 @@ data4 <- data3 %>% filter(country == "DE") %>% filter(time >= 1999 & time < 2018
            # "mean_coast",
            # "mean_business.B_S_X_K642",
            "mean_capital_fixed.TOTAL",
-           "mean_tert_ed",
+           "mean_gdp_share.NUTS.2",
+           "mean_tert_ed"
            # "mean_employment.TOTAL_capita",
-           "mean_employment.TOTAL_capita.NUTS.2"
+           # "mean_employment.TOTAL_capita.NUTS.2"
            # "mean_gdp.EUR_HAB",
            # "mean_gdp_share"
            )) %>%
-  distinct(., id, time, .keep_all= TRUE) %>% select(., id, time, everything())
+  distinct(id.NUTS.2, time, .keep_all= TRUE) %>% select(id.NUTS.2, time, everything())
 
-  
 # rm(list = c("added","added2","added3","added4","data","data2","port2011","port2013"))
 
+# Adding dependent variable growth rate
+
 data5 <- make.pbalanced(data4, balance.type = "shared.individuals")
+data5 %>% filter(id.NUTS.2 == "69")
+b <- unique(data5$id.NUTS.2)
+# b <- intersect(b, unique(data5$id.NUTS.2))
 
-data5 %>% filter(nuts.2=="DE60") %>% select(id.NUTS.2)
+# Trying to restrict the control group to observation with similar behaviour after treatment
+# Negative growth in all periods
+# b <- data5 %>% filter(time == "2011")  %>% filter(hours.worked.G_I_growth < 0) %>% select(id.NUTS.2) %>%
+#   inner_join(data5 %>% filter(time == "2010")  %>% filter(hours.worked.G_I_growth < 0) %>% select(id.NUTS.2)) %>%
+#   inner_join(data5 %>% filter(time == "2011")  %>% filter(hours.worked.G_I_growth < 0) %>% select(id.NUTS.2)) %>%
+#   inner_join(data5 %>% filter(time == "2012")  %>% filter(hours.worked.G_I_growth < 0) %>% select(id.NUTS.2)) %>%
+#   inner_join(data5 %>% filter(time == "2013")  %>% filter(hours.worked.G_I_growth < 0) %>% select(id.NUTS.2)) %>%
+#   inner_join(data5 %>% filter(time == "2014")  %>% filter(hours.worked.G_I_growth < 0) %>% select(id.NUTS.2)) %>% unlist()
+# 
+# Mean negative growth
 
-c <- unique(data5$id.NUTS.2)
-c <- c[!c %in%  c(69,60)]
+
 # c <- c[!c %in% c(155,322,403,644,1105,1112,1123)]
 # Excluding from control for Duisburg (DEA12): DEA1C, DEA1D, DEA1F, DEA11, DEA14, DEA16, DEA17. c(403,413,414,416,402,405,407,408)
 # Alternative (all DEA1): c(402:416)
@@ -425,20 +585,26 @@ c <- c[!c %in%  c(69,60)]
 #   geom_line(aes(y=employment.O_U,colour="employment.O_U")) +
 #   geom_line(aes(y=employment.R_U,colour="employment.R_U")) 
 
-test <- plm(
-  gva.TOTAL_capita.NUTS.2 ~
-    mean_gva.B_E_F_share.NUTS.2 +
-    mean_tert_ed +
-    mean_employment.TOTAL_capita.NUTS.2,
+# test <- plm(
+#   gva.TOTAL_capita.NUTS.2.NUTS.2 ~
+#     mean_gva.B_E_F_share.NUTS.2 +
 #     mean_tert_ed +
-#     mean_gdp_share,
-    data = data5,
-    index = c("id", "time"),
-    model = "within",
-    effect = "twoways")
-summary(test)
+#     mean_employment.TOTAL_capita.NUTS.2 +
+#     mean_capital_fixed.TOTAL +
+#     mean_tert_ed +
+#     mean_gdp_share.NUTS.2 ,
+#     data = data5,
+#     index = c("id.NUTS.2", "time"),
+#     model = "within",
+#     effect = "twoways")
+# summary(test)
 
-
+# b <- unique(data5$id.NUTS.2)
+# data5 %>% filter(nuts.2=="EL30")
+# data5 %>% filter(nuts.2=="EL30") %>% filter(time=="2011")
+# for (val in b) {
+c <- b[!b %in%  c(69)]
+# c <- b[!c %in%  c(69,60)]
 # Run synthetic control estimation and plot results
 dataprep.out<-
   dataprep(
@@ -447,34 +613,36 @@ dataprep.out<-
       # "mean_population.density",
       # "mean_urban",
       # "mean_metro",
-      # "gva.TOTAL_capita",
+      # "gva.TOTAL_capita.NUTS.2",
       # "mean_gva.B_E_F_share",
       "mean_gva.B_E_F_share.NUTS.2",
       # "mean_port",
       # "mean_coast",
       # "mean_business.B_S_X_K642",
       "mean_capital_fixed.TOTAL",
-      "mean_tert_ed",
-      "mean_employment.TOTAL_capita.NUTS.2"
+      "mean_dependency.ratio",
+      "mean_gdp_share.NUTS.2",
+      "mean_tert_ed"
+      # "mean_employment.TOTAL_capita.NUTS.2"
       # "mean_gdp.EUR_HAB",
       # "gdp_share"
                    ),
     predictors.op = "mean",
-    dependent = "gva.TOTAL_capita.NUTS.2",
+    dependent = "hours.worked.G_I",
     unit.variable = c("id.NUTS.2"),
     time.variable = c("time"),
     special.predictors = list(
-      list("gva.TOTAL_capita.NUTS.2", 2000, "mean"),
-      list("gva.TOTAL_capita.NUTS.2", 2001, "mean"),
-      list("gva.TOTAL_capita.NUTS.2", 2002, "mean"),
-      list("gva.TOTAL_capita.NUTS.2", 2003, "mean"),
-      list("gva.TOTAL_capita.NUTS.2", 2004, "mean"),
-      list("gva.TOTAL_capita.NUTS.2", 2005, "mean"),
-      list("gva.TOTAL_capita.NUTS.2", 2006, "mean"),
-      list("gva.TOTAL_capita.NUTS.2", 2007, "mean"),
-      list("gva.TOTAL_capita.NUTS.2", 2008, "mean"),
-      list("gva.TOTAL_capita.NUTS.2", 2011, "mean"),
-      list("gva.TOTAL_capita.NUTS.2", 2010, "mean")
+      list("hours.worked.G_I", 2000, "mean"),
+      # list("hours.worked.G_I", 2001, "mean"),
+      # list("hours.worked.G_I", 2002, "mean"),
+      # list("hours.worked.G_I", 2003, "mean"),
+      # list("hours.worked.G_I", 2004, "mean"),
+      list("hours.worked.G_I", 2005, "mean"),
+      # list("hours.worked.G_I", 2006, "mean"),
+      # list("hours.worked.G_I", 2007, "mean"),
+      # list("hours.worked.G_I", 2008, "mean")
+      # list("hours.worked.G_I", 2009, "mean"),
+      list("hours.worked.G_I", 2010, "mean")
     ),
     treatment.identifier = 69,
     controls.identifier = c,
@@ -485,19 +653,55 @@ dataprep.out<-
   )
 
 
-gva.TOTAL_capita.NUTS.2_DEA1 <- synth(dataprep.out, verbose = TRUE, optimxmethod = "All")
-gva.TOTAL_capita.NUTS.2_DEA1_2 <- improveSynth(gva.TOTAL_capita.NUTS.2_DEA1,dataprep.out)
+hours.worked.G_I.out <- synth(dataprep.out, verbose = TRUE, optimxmethod = "All")
+# hours.worked.G_I.out <- improveSynth(hours.worked.G_I.out,dataprep.out)
 
-synth.tables <- synth.tab(dataprep.res = dataprep.out,synth.res = gva.TOTAL_capita.NUTS.2_DEA1)
-print(synth.tables)
-synth.tables$tab.w %>% filter(w.weights > 0)
+# }
 
-path.plot(synth.res = gva.TOTAL_capita.NUTS.2_DEA1_2,
+synth.tables <- synth.tab(dataprep.res = dataprep.out,synth.res = hours.worked.G_I.out)
+print(synth.tables$tab.pred)
+print(synth.tables$tab.v)
+test <- synth.tables$tab.w %>% filter(w.weights > 0)
+print(synth.tables$tab.w %>% filter(w.weights > 0))
+
+path.plot(synth.res = hours.worked.G_I.out,
           dataprep.res = dataprep.out,
           tr.intake = 2011,
-          Ylab = c("Gross value added (thousand euros)"),
+          Ylab = c("Hours worked in wholesale and retail trade, transportation and storage,",
+                   "accommodation and food service activities (thousands)"),
           Xlab = c("year"),
           Legend = c("Duisburg","Synthetic Duisburg"),
 )
 
+data5 %>% filter(id.NUTS.2 == "92") %>% ggplot(aes(x=time)) + geom_line(aes(y=nace_r1,colour="nace_r1"))
+data3 %>% filter(id.NUTS.2 %in% test$unit.numbers | nuts.2 == "DEA1") %>% ggplot(aes(x=time,colour=factor(id.NUTS.2))) + geom_line(aes(y=hours.worked.G_I)) +
+  gghighlight(nuts.2 == "DEA1")
+data3 %>% filter(country == "DE") %>% ggplot(aes(x=time,colour=factor(id.NUTS.2))) + geom_line(aes(y=hours.worked.G_I)) +
+  gghighlight(nuts.2 == "DEA1")
+data3 %>% filter(id.NUTS.2 == "69") %>% ggplot(aes(x=time)) + geom_line(aes(y=hours.worked.A,colour="hours.worked.A")) + 
+  geom_line(aes(y=hours.worked.B_E,colour="hours.worked.B_E")) + geom_line(aes(y=hours.worked.C,colour="hours.worked.C")) + 
+  geom_line(aes(y=hours.worked.F,colour="hours.worked.F")) + geom_line(aes(y=hours.worked.A,colour="hours.worked.A")) + 
+  geom_line(aes(y=hours.worked.G_I,colour="hours.worked.G_I")) + geom_line(aes(y=hours.worked.G_J,colour="hours.worked.G_J")) + 
+  geom_line(aes(y=hours.worked.J,colour="hours.worked.J")) + geom_line(aes(y=hours.worked.K_N,colour="hours.worked.K_N")) + 
+  geom_line(aes(y=hours.worked.K,colour="hours.worked.K")) + geom_line(aes(y=hours.worked.L,colour="hours.worked.L")) + 
+  geom_line(aes(y=hours.worked.M_N,colour="hours.worked.M_N")) + geom_line(aes(y=hours.worked.O_Q,colour="hours.worked.O_Q")) + 
+  geom_line(aes(y=hours.worked.O_U,colour="hours.worked.O_U")) + geom_line(aes(y=hours.worked.R_U,colour="hours.worked.R_U"))
+
+data3 %>% filter(id.NUTS.2 == "69") %>% ggplot(aes(x=time)) + geom_line(aes(y=employment.o15.F,colour="employment.o15.F")) + 
+  geom_line(aes(y=employment.o15.G_I,colour="employment.o15.G_I")) + geom_line(aes(y=employment.o15.J_K,colour="employment.o15.J_K")) + 
+  geom_line(aes(y=employment.o15.L_Q,colour="employment.o15.L_Q"))
+
+data3 %>% filter(id.NUTS.2 == 69) %>% select(road_freight.NUTS.2)
+data5 %>% filter(geo == "EL304") 
+
+  synth.tables$tab.w$unit.names
 synth.tables$tab.w %>% filter(w.weights > 0)
+
+gaps.plot(synth.res = hours.worked.G_I.out,
+          dataprep.res = dataprep.out,
+          Ylab = c("Maritime freight (thousand tonnes)"),
+          Xlab = c("Time"),
+          Main = c("Gaps: Treated - Synthetic"),
+          tr.intake = 2011,
+          Ylim = NA,
+          Z.plot = FALSE)
