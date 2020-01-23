@@ -18,6 +18,8 @@ library(gghighlight)
 library(lmtest)
 library(sandwich)
 library(robustbase)
+library(clubSandwich)
+library(ggpubr)
 
 # version
 # Load data from Eurostat (NUTS 3)
@@ -145,8 +147,9 @@ data <- get_eurostat(id = "demo_r_d3dens", time_format = "num") %>%
   left_join(get_eurostat(id = "bd_hgnace2_r3", time_format = "num", filters = list(indic_sb = "V11910", nace_r2 = "R_S")), 
             by = c("geo","time")) %>% rename(business.R_S  = values) %>%
   left_join(get_eurostat(id = "ipr_ta_reg", time_format = "num", filters = list(unit = "NR")), 
-            by = c("geo","time")) %>% rename(trade.mark  = values)
-
+            by = c("geo","time")) %>% rename(trade.mark  = values) %>%
+  left_join(get_eurostat(id = "demo_r_pjanind3", time_format = "num", filters = list(indic_de = "DEPRATIO1", unit = "PC")), 
+            by = c("geo","time")) %>% rename(dependency.ratio  = values) %>% select(-indic_de)
   
 # Drop unit identifiers
 
@@ -289,7 +292,7 @@ data <- data %>% mutate(country = substr(geo,1,2)) %>% mutate(nuts.2 = substr(ge
     mutate(employment.o15.L_Q = ifelse(is.na(employment.o15.nace1.L_Q),employment.o15.nace2.L_Q,employment.o15.nace1.L_Q)) %>% 
     mutate(employment.o15.NRP = ifelse(is.na(employment.o15.nace1.NRP),employment.o15.nace2.NRP,employment.o15.nace1.NRP)) %>% 
     left_join(get_eurostat(id = "demo_r_pjanind2", time_format = "num", filters = list(unit = "PC", indic_de = "DEPRATIO1")), 
-              by = c("nuts.2" = "geo","time")) %>% rename(dependency.ratio = values) %>% select(-c("unit","indic_de")) 
+              by = c("nuts.2" = "geo","time")) %>% rename(dependency.ratio.NUTS.2 = values) %>% select(-c("unit","indic_de")) 
   
   
   # Add spatial information
@@ -436,44 +439,78 @@ data3$id.NUTS.2 <- data3 %>% group_by(nuts.2) %>% group_indices()
 # Creat country dummies
 data3 <- data3 %>% to_dummy(country, suffix = "label") %>% bind_cols(data3) 
 
+data3 %>% filter(geo == "EL307") %>% select(id)
 
-data3 %>% filter(id.NUTS.2 == "69") %>% distinct(id.NUTS.2, time, .keep_all= TRUE) %>% ggplot(aes(x = time)) + 
-  geom_line(aes(y = trade.mark.NUTS.2)) +
-  geom_vline(aes(xintercept = 2011), linetype = "dotted")
+ggarrange(
+  data3 %>% filter(id == "584") %>% distinct(id, time, .keep_all= TRUE) %>% 
+    ggplot(aes(x = time)) + 
+      geom_line(aes(y = road_freight)) +
+      ylab(expression(atop("Road freight", paste("(thousand tonnes)")))) +
+      geom_vline(aes(xintercept = 2009), linetype = "dotted"),
+  data3 %>% filter(id == "584") %>% distinct(id, time, .keep_all= TRUE) %>% 
+    ggplot(aes(x = time)) + 
+    geom_line(aes(y = employment.TOTAL)) +
+    ylab(expression(atop("Employment", paste("(thousand persons)")))) +
+    geom_vline(aes(xintercept = 2009), linetype = "dotted"),
+  data3 %>% filter(id == "584") %>% distinct(id, time, .keep_all= TRUE) %>% 
+    ggplot(aes(x = time)) + 
+    geom_line(aes(y = employment.TOTAL/population)) +
+    ylab(expression(atop("Employment per capita", paste("(rate)")))) +
+    geom_vline(aes(xintercept = 2009), linetype = "dotted"),
+  data3 %>% filter(id == "584") %>% distinct(id, time, .keep_all= TRUE) %>% 
+    ggplot(aes(x = time)) + 
+    geom_line(aes(y = population)) +
+    ylab(expression(atop("Population", paste("thousand persons")))) +
+    geom_vline(aes(xintercept = 2009), linetype = "dotted"),
+  data3 %>% filter(id == "584") %>% distinct(id, time, .keep_all= TRUE) %>% 
+    ggplot(aes(x = time)) + 
+    geom_line(aes(y = gva.TOTAL)) +
+    ylab(expression(atop("Gross value added", paste("thousand euros")))) +
+    geom_vline(aes(xintercept = 2009), linetype = "dotted"),
+  data3 %>% filter(id == "584") %>% distinct(id, time, .keep_all= TRUE) %>% 
+    ggplot(aes(x = time)) + 
+    geom_line(aes(y = gva.TOTAL/population)) +
+    ylab(expression(atop("Gross value added per capita", paste("rate")))) +
+    geom_vline(aes(xintercept = 2009), linetype = "dotted")
+,ncol = 2, nrow = 4)
 
+data3 %>% filter(country == "EL") %>% ggplot(aes(x=time,colour=factor(id))) + geom_line(aes(y=employment.TOTAL)) +
+  gghighlight(geo == "EL307")
 
-lm.test <- data3 %>% lm(employment.TOTAL ~ population + population.density + coast + urban + port + metro + gva.TOTAL_capita + gva.B_E_F_share + trade.mark, .) 
+lm.test <- data3 %>% lm(employment.TOTAL ~ population + population.density + coast + urban + port + metro + gva.TOTAL_capita + gva.B_E_F_share + trade.mark + 
+                          gdp_share, .) 
 lm.test %>% summary() %>% print() %>% bptest()
 lm.test.robust <- lm.test %>% coeftest(vcov = vcovHC(.)) %>% print()
-data3 %>% lmrob(employment.TOTAL ~ population + population.density + coast + urban + port + metro + gva.TOTAL_capita + gva.B_E_F_share + trade.mark, .) %>% summary()
+# data3 %>% lmrob(employment.TOTAL ~ population + population.density + coast + urban + port + metro + gva.TOTAL_capita + gva.B_E_F_share + trade.mark, .) %>% summary()
 
-data3 %>% distinct(id, time, .keep_all= TRUE) %>% make.pbalanced(balance.type = "shared.individuals") %>% 
-  plm(employment.TOTAL ~ population + population.density + coast + urban + port + metro + gva.TOTAL_capita + gva.B_E_F_share + trade.mark + country_AL + country_AT +
-        country_BE + country_BG + country_CH + country_CY + country_CZ + country_DE + country_DK + country_EE + country_EL + country_ES + country_FI + country_FR +
-        country_HR + country_HU + country_IE + count,
-              index = c("id","time"), model="within", effect="twoways", data = .) %>% summary()
-coeftest(plm.model, vcov.=function(x) vcovHC(x, type="sss"))
+plm.test <- data3 %>% distinct(id, time, .keep_all= TRUE) %>% make.pbalanced(balance.type = "shared.individuals") %>% 
+  plm(employment.TOTAL ~ population + population.density + coast + urban + port + metro + gva.TOTAL_capita + gva.B_E_F_share + trade.mark + gdp_share,
+              index = c("id","time"), model="within", effect="twoways", data = .) 
+plm.test %>% summary() %>% print() %>% bptest()
+plm.test.robust <- plm.test %>% coeftest(vcov=vcovHC(., type="HC0", cluster="group")) %>% print()
 
 
 # Preparing data set for synthetic control
-data4 <- data3 %>% filter(time >= 2000 & time < 2017) %>% 
+data4 <- data3 %>% filter(time >= 2000 & time < 2017) %>% filter(country == "DE") %>% 
   distinct(id, time, .keep_all= TRUE) %>% group_by(id) %>%
   mutate(treatment = ifelse(time >= 2011, 1, 0)) %>%
   group_by(id, treatment) %>%
   mutate(mean_gva.B_E_F_share = ifelse(time < 2011 & is.na(gva.B_E_F_share), mean(gva.B_E_F_share, na.rm = TRUE), gva.B_E_F_share)) %>%
-  mutate(mean_tert_ed = ifelse(time < 2011 & is.na(tert_ed), mean(tert_ed, na.rm = TRUE),tert_ed)) %>%
-  mutate(mean_dependency.ratio = ifelse(time < 2011 & is.na(dependency.ratio), mean(dependency.ratio, na.rm = TRUE),dependency.ratio)) %>%
-  mutate(mean_capital_fixed.TOTAL = ifelse(time < 2011 & is.na(capital_fixed.TOTAL), mean(capital_fixed.TOTAL, na.rm = TRUE),capital_fixed.TOTAL)) %>%
-  mutate(mean_gdp_share = ifelse(time < 2011 & is.na(gdp_share), mean(gdp_share, na.rm = TRUE),gdp_share)) %>% group_by(id) %>%
+  mutate(mean_trade.mark = ifelse(time < 2011 & is.na(trade.mark), mean(trade.mark, na.rm = TRUE), trade.mark)) %>%
+  mutate(mean_gva.TOTAL_capita = ifelse(time < 2011 & is.na(gva.TOTAL_capita), mean(gva.TOTAL_capita, na.rm = TRUE), gva.TOTAL_capita)) %>%
+  mutate(mean_population = ifelse(time < 2011 & is.na(population), mean(population, na.rm = TRUE), population)) %>%
+  mutate(mean_gdp_share = ifelse(time < 2011 & is.na(gdp_share), mean(gdp_share, na.rm = TRUE), gdp_share)) %>% group_by(id) %>%
+  mutate(mean_population.density = ifelse(time < 2011 & is.na(population.density), mean(population.density, na.rm = TRUE), population.density)) %>% group_by(id) %>%
   filter(!is.na(id)) %>%
   filter(!is.na(employment.TOTAL)) %>%
   filter(!is.na(geo)) %>%
   filter(!is.na(time)) %>%
   filter(!is.na(mean_gva.B_E_F_share)) %>%
-  filter(!is.na(mean_tert_ed)) %>%
-  filter(!is.na(mean_dependency.ratio)) %>%
-  filter(!is.na(mean_capital_fixed.TOTAL)) %>%
+  filter(!is.na(mean_population)) %>%
+  filter(!is.na(mean_trade.mark)) %>%
+  filter(!is.na(mean_gva.TOTAL_capita)) %>%
   filter(!is.na(mean_gdp_share)) %>%
+  filter(!is.na(mean_population.density)) %>%
   as.data.frame() %>% 
   select(c(
            "employment.TOTAL", 
@@ -482,20 +519,23 @@ data4 <- data3 %>% filter(time >= 2000 & time < 2017) %>%
            "geo",
            "nuts.2",
            "mean_gva.B_E_F_share",
-           "mean_tert_ed",
-           "mean_dependency.ratio",
-           "mean_capital_fixed.TOTAL",
+           "mean_population",
+           "mean_trade.mark",
+           "mean_gva.TOTAL_capita",
+           "mean_population.density",
            "mean_gdp_share"
            )) %>%
   distinct(id, time, .keep_all= TRUE) %>% select(id, time, everything())
 
 
 data5 <- make.pbalanced(data4, balance.type = "shared.individuals")
+data3 %>% filter(id.NUTS.2 == "69", time == "2011") %>% select(id)
 data5 %>% filter(id == "403")
 b <- unique(data5$id)
 
-data5 %>% filter(nuts.2 == "DEA1" & time == "2011") %>% select(id)
+# c <- b[!b %in%  c(578:584)]
 c <- b[!b %in%  c(402:416)]
+
 
 # Run synthetic control estimation and plot results
 dataprep.out<-
@@ -503,9 +543,10 @@ dataprep.out<-
     foo = data5,
     predictors = c(
       "mean_gva.B_E_F_share",
-      "mean_tert_ed",
-      "mean_dependency.ratio",
-      "mean_capital_fixed.TOTAL",
+      "mean_population",
+      "mean_trade.mark",
+      "mean_gva.TOTAL_capita",
+      "mean_population.density",
       "mean_gdp_share"
                    ),
     predictors.op = "mean",
@@ -517,8 +558,8 @@ dataprep.out<-
       # list("employment.TOTAL", 2001, "mean"),
       # list("employment.TOTAL", 2002, "mean"),
       # list("employment.TOTAL", 2003, "mean"),
-      # list("employment.TOTAL", 2004, "mean"),
-      list("employment.TOTAL", 2005, "mean"),
+      list("employment.TOTAL", 2004, "mean"),
+      # list("employment.TOTAL", 2005, "mean"),
       # list("employment.TOTAL", 2006, "mean"),
       # list("employment.TOTAL", 2007, "mean"),
       # list("employment.TOTAL", 2008, "mean"),
@@ -547,7 +588,7 @@ path.plot(synth.res = employment.TOTAL.out,
           tr.intake = 2011,
           Ylab = c("Employment (thousand persons)"),
           Xlab = c("year"),
-          Legend = c("Duisburg","Synthetic Duisburg"),
+          Legend = c("Piraeus","Synthetic Piraeus"),
 )
 
 
