@@ -20,6 +20,8 @@ library(sandwich)
 library(robustbase)
 library(clubSandwich)
 library(ggpubr)
+library(xtable)
+library(stargazer)
 
 # version
 # Load data from Eurostat (NUTS 3)
@@ -441,6 +443,8 @@ data3 <- data3 %>% to_dummy(country, suffix = "label") %>% bind_cols(data3)
 
 data3 %>% filter(geo == "EL307") %>% select(id)
 
+
+# Evaluate different variables' behavior over time
 ggarrange(
   data3 %>% filter(id == "584") %>% distinct(id, time, .keep_all= TRUE) %>% 
     ggplot(aes(x = time)) + 
@@ -477,6 +481,7 @@ ggarrange(
 data3 %>% filter(country == "EL") %>% ggplot(aes(x=time,colour=factor(id))) + geom_line(aes(y=employment.TOTAL)) +
   gghighlight(geo == "EL307")
 
+# Fit regression to justify predictor variable selection
 lm.test <- data3 %>% lm(employment.TOTAL ~ population + population.density + coast + urban + port + metro + gva.TOTAL_capita + gva.B_E_F_share + trade.mark + 
                           gdp_share, .) 
 lm.test %>% summary() %>% print() %>% bptest()
@@ -484,14 +489,19 @@ lm.test.robust <- lm.test %>% coeftest(vcov = vcovHC(.)) %>% print()
 # data3 %>% lmrob(employment.TOTAL ~ population + population.density + coast + urban + port + metro + gva.TOTAL_capita + gva.B_E_F_share + trade.mark, .) %>% summary()
 
 plm.test <- data3 %>% distinct(id, time, .keep_all= TRUE) %>% make.pbalanced(balance.type = "shared.individuals") %>% 
-  plm(employment.TOTAL ~ population + population.density + coast + urban + port + metro + gva.TOTAL_capita + gva.B_E_F_share + trade.mark + gdp_share,
+  plm(log(employment.TOTAL) ~ population + population.density + gva.TOTAL_capita + gva.B_E_F_share + trade.mark + gdp_share + lag(log(employment.TOTAL)),
               index = c("id","time"), model="within", effect="twoways", data = .) 
-plm.test %>% summary() %>% print() %>% bptest()
-plm.test.robust <- plm.test %>% coeftest(vcov=vcovHC(., type="HC0", cluster="group")) %>% print()
+plm.test %>% summary() %>% print() %>% bptest() 
+plm.test.robust <- plm.test %>% coeftest(((length(unique(data3$id)))/(length(unique(data3$id)) - 1)) * vcovHC(., type="HC1", cluster="group")) %>% print()
+stargazer(plm.test)
 
+# Define treatment variable
+data3 %>% mutate(rail = ifelse(geo == "DEA12" & time >= 2011, 1,
+                               ifelse(geo == "PL311" & time >= 2011, 1, 
+                                      ifelse(geo == "PL811" $))))
 
 # Preparing data set for synthetic control
-data4 <- data3 %>% filter(time >= 2000 & time < 2017) %>% filter(country == "DE") %>% 
+data4 <- data3 %>% filter(time >= 2000 & time < 2017) %>% #filter(country == "DE") %>% 
   distinct(id, time, .keep_all= TRUE) %>% group_by(id) %>%
   mutate(treatment = ifelse(time >= 2011, 1, 0)) %>%
   group_by(id, treatment) %>%
@@ -529,12 +539,12 @@ data4 <- data3 %>% filter(time >= 2000 & time < 2017) %>% filter(country == "DE"
 
 
 data5 <- make.pbalanced(data4, balance.type = "shared.individuals")
-data3 %>% filter(id.NUTS.2 == "69", time == "2011") %>% select(id)
+data3 %>% filter(nuts.2 == "DE60", time == "2011") %>% select(id)
 data5 %>% filter(id == "403")
 b <- unique(data5$id)
 
 # c <- b[!b %in%  c(578:584)]
-c <- b[!b %in%  c(402:416)]
+c <- b[!b %in%  c(322,402:416)]
 
 
 # Run synthetic control estimation and plot results
@@ -594,8 +604,8 @@ path.plot(synth.res = employment.TOTAL.out,
 
 data3 %>% filter(id %in% test$unit.numbers | geo == "DEA1") %>% ggplot(aes(x=time,colour=factor(id))) + geom_line(aes(y=employment.TOTAL)) +
   gghighlight(geo == "DEA1")
-data3 %>% filter(country == "DE") %>% ggplot(aes(x=time,colour=factor(id))) + geom_line(aes(y=employment.TOTAL)) +
-  gghighlight(geo == "DEA1")
+data3 %>% filter(country == "EL") %>% ggplot(aes(x=time,colour=factor(id))) + geom_line(aes(y=employment.TOTAL)) +
+  gghighlight(geo == "EL307")
 data3 %>% filter(id == "69") %>% ggplot(aes(x=time)) + geom_line(aes(y=hours.worked.A,colour="hours.worked.A")) + 
   geom_line(aes(y=hours.worked.B_E,colour="hours.worked.B_E")) + geom_line(aes(y=hours.worked.C,colour="hours.worked.C")) + 
   geom_line(aes(y=hours.worked.F,colour="hours.worked.F")) + geom_line(aes(y=hours.worked.A,colour="hours.worked.A")) + 
