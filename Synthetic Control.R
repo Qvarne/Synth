@@ -22,6 +22,8 @@ library(clubSandwich)
 library(ggpubr)
 library(xtable)
 library(stargazer)
+library(Zelig)
+library(cem)
 
 # version
 # Load data from Eurostat (NUTS 3)
@@ -372,8 +374,9 @@ port2009 <- read.csv("Ports_2009.csv") %>% rename(geo = GEO) %>% as_tibble %>% m
 
 port2013 <- read.csv("Ports_2013.csv") %>% rename(geo = GEO) %>% as_tibble %>% mutate(geo = as.character(geo))
 
-data2 <- data2 %>% mutate(Port.in.NUTS.3 = ifelse(geo %in% port2009$geo & time >= 2009 & time < 2013, 1, 
-                                            ifelse(geo %in% port2013$geo & time >=2013, 1, Port.in.NUTS.3)))
+data2 <- data2 %>% mutate(Port.in.NUTS.3 = ifelse(geo %in% port2009$geo & time >= 2009 & time < 2013, 1,
+                                                  ifelse(geo %in% port2013$geo & time >=2013, 1, Port.in.NUTS.3)))
+
 
 # Take care of Dummies.csv
 dummies <- read.csv("Dummies.csv") %>% as_tibble()
@@ -385,6 +388,47 @@ data2 <- data2 %>% left_join(dummies, by = "geo") %>% mutate(Coastal.region = if
 # Reanme dummies
 data2 <- data2 %>% rename(coast = Coastal.region) %>% rename(port = Port.in.NUTS.3) %>% rename(metro = Metro.region.corresponding.to.the.NUTS) %>%
   rename(urban = Rural...urban.typology)
+
+# Find a way to join continued and discontinued NUTS 3 codes (try a join)
+added5 <- data2 %>% filter((geo %in% c("DE411","DE412","DE413","DE414","DE415","DE416","DE417","DE418","DE421","DE422","DE423","DE424","DE425","DE426","DE427","DE428",
+                                      "DE429","DE42A","DE801","DE802","DE805","DE806","DE807","DE808","DE809","DE80A","DE80B","DE80C","DE80D","DE80E","DE80F","DE80G",
+                                      "DE80H","DE80I","DE915","DE919","DEA21","DEA25","DEB16","DEB19","DED11","DED12","DED13","DED14","DED15","DED16","DED17","DED18",
+                                      "DED19","DED1A","DED1B","DED1C","DED22","DED23","DED24","DED25","DED26","DED27","DED28","DED29","DED2A","DED2B","DED31","DED32",
+                                      "DED33","DED34","DED35","DED36","EL111","EL112","EL113","EL114","EL115","EL121","EL122","EL123","EL124","EL125","EL126","EL127",
+                                      "EL131","EL132","EL133","EL134","EL141","EL142","EL143","EL144","EL211","EL212","EL213","EL214","EL221","EL222","EL223","EL224",
+                                      "EL231","EL232","EL233","EL241","EL242","EL243","EL244","EL245","EL251","EL252","EL253","EL254","EL255","EL300","EU27_2019",
+                                      "FI131","FI132","FI133","FI134","FI181","FI182","FI183","FI184","FI185","FI186","FI187","FI1A1","FI1A2","FI1A3","FI1D4","FI1D6",
+                                      "FR2","FR21","FR211","FR212","FR213","FR214","FR22","FR221","FR222","FR223","FR23","FR231","FR232","FR24","FR241","FR242",
+                                      "FR243","FR244","FR245","FR246","FR25","FR251","FR252","FR253","FR26","FR261","FR262","FR263","FR264","FR3","FR30","FR301",
+                                      "FR302","FR4","FR41","FR411","FR412","FR413","FR414","FR42","FR421","FR422","FR43","FR431","FR432","FR433","FR434","FR5","FR51",
+                                      "FR511","FR512","FR513","FR514","FR515","FR52","FR521","FR522","FR523","FR524","FR53","FR531","FR532","FR533","FR534","FR6",
+                                      "FR61","FR611","FR612","FR613","FR614","FR615","FR62","FR621","FR622","FR623","FR624","FR625","FR626","FR627","FR628","FR63",
+                                      "FR631","FR632","FR633","FR7","FR71","FR711","FR712","FR713","FR714","FR715","FR716","FR717","FR718","FR72","FR721","FR722",
+                                      "FR723","FR724","FR8","FR81","FR811","FR812","FR813","FR814","FR815","FR82","FR821","FR822","FR823","FR824","FR825","FR826",
+                                      "FR83","FR831","FR832","FRA","FRA1","FRA10","FRA2","FRA20","FRA3","FRA30","FRA4","FRA40","FRA5","FRA50","HR011","HR012","HR013",
+                                      "HR014","HR015","HR016","HR021","HR022","HR023","HR024","HR025","HR026","HR027","HR028","HU10","HU101","HU102","IE01","IE011",
+                                      "IE012","IE013","IE02","IE021","IE022","IE023","IE024","IE025","ITC45","ITD10","ITD20","ITD31","ITD32","ITD33","ITD34","ITD35",
+                                      "ITD36","ITD37","ITD41","ITD42","ITD43","ITD44","ITD51","ITD52","ITD53","ITD54","ITD55","ITD56","ITD57","ITD58","ITD59","ITE11",
+                                      "ITE12","ITE13","ITE14","ITE15","ITE16","ITE17","ITE18","ITE19","ITE1A","ITE21","ITE22","ITE31","ITE32","ITE33","ITE34","ITE41",
+                                      "ITE42","ITE43","ITE44","ITE45","ITF41","ITF42","LT00","LT001","LT002","LT003","LT004","LT005","LT006","LT007","LT008","LT009",
+                                      "LT00A","NL121","NL122","NL123","NL322","NL326","NL331","NL334","NL335","NL336","NL338","NL339","PL1","PL11","PL113","PL114",
+                                      "PL115","PL116","PL117","PL12","PL121","PL122","PL127","PL128","PL129","PL12A","PL12B","PL12C","PL12D","PL12E","PL215","PL216",
+                                      "PL3","PL31","PL311","PL312","PL314","PL315","PL32","PL323","PL324","PL325","PL326","PL33","PL331","PL332","PL34","PL343",
+                                      "PL344","PL345","PL422","PL423","PL425","PL521","PL522","PL614","PL615","PL631","PL635","PT113","PT114","PT115","PT116","PT117",
+                                      "PT118","PT161","PT162","PT163","PT164","PT165","PT166","PT167","PT168","PT169","PT16A","PT16C","PT171","PT172","PT182","PT183",
+                                      "SI011","SI012","SI013","SI014","SI015","SI016","SI017","SI018","SI021","SI022","SI023","SI024","UKD21","UKD22","UKD31","UKD32",
+                                      "UKD43","UKD51","UKD52","UKD53","UKD54","UKE43","UKF23","UKG34","UKG35","UKH13","UKH22","UKH33","UKI11","UKI12","UKI21","UKI22",
+                                      "UKI23","UKJ23","UKJ24","UKJ33","UKJ42","UKM2","UKM21","UKM22","UKM23","UKM24","UKM25","UKM26","UKM27","UKM28","UKM3","UKM31",
+                                      "UKM32","UKM33","UKM34","UKM35","UKM36","UKM37","UKM38","UKN01","UKN02","UKN03","UKN04","UKN05","BEXXX","DKXXX","FIXXX","ATZZZ",
+                                      "BEZZZ","DKZZZ","ESZZZ","FIZZZ","HUZZZ","ITZZZ","MTZZZ","NLZZZ","NOZZZ","PTZZZ","SEZZZ","UKZZZ"))) 
+
+# Recode geo (continue here)
+added5 <- added5 %>% mutate(geo == ifelse(geo == "DE411", "DE403",
+                                          ifelse(geo == "DE412", "DE405",
+                                                 ifelse(geo == "DE413", "DE409",
+                                                        ifelse(geo == "DE414", "DE40A",
+                                                               ifelse())))))
+
 
 # Drop discontinued NUTS-3 codes
 data2 <- data2 %>% filter(!(geo %in% c("DE411","DE412","DE413","DE414","DE415","DE416","DE417","DE418","DE421","DE422","DE423","DE424","DE425","DE426",
@@ -495,10 +539,41 @@ plm.test %>% summary() %>% print() %>% bptest()
 plm.test.robust <- plm.test %>% coeftest(((length(unique(data3$id)))/(length(unique(data3$id)) - 1)) * vcovHC(., type="HC1", cluster="group")) %>% print()
 stargazer(plm.test)
 
+# Revisit matching
 # Define treatment variable
-data3 %>% mutate(rail = ifelse(geo == "DEA12" & time >= 2011, 1,
-                               ifelse(geo == "PL311" & time >= 2011, 1, 
-                                      ifelse(geo == "PL811" $))))
+data3 <- data3 %>% mutate(rail = ifelse(geo == "DEA12" & time >= 2011, 1,
+                                      ifelse(geo == "PL811" & time >= 2011, 1, 
+                                             ifelse(geo == "CZ053" & time >= 2012, 1,
+                                                    ifelse(geo == "PL911" & time >= 2012, 1,
+                                                           ifelse(geo == "DE600" & time >= 2013, 1,
+                                                                  ifelse(geo == "PL711" & time >= 2013, 1,
+                                                                         ifelse(geo == "ES300" & time >= 2014, 1, 0))))))))
+
+# Prepare data for matching
+# data4 <- data3 %>% select(c("rail","metro","urban","coast","port","time","gva.TOTAL_capita","population.density","gva.TOTAL_capita","id","geo")) %>% 
+#   filter(time >= 2011 & time <= 2016) %>%
+#   group_by(id) %>% 
+#   filter(!is.na(rail)) %>%
+#   filter(!is.na(metro)) %>%
+#   filter(!is.na(urban)) %>%
+#   filter(!is.na(coast)) %>%
+#   filter(!is.na(port)) %>%
+#   filter(!is.na(time)) %>%
+#   filter(!is.na(gva.TOTAL_capita)) %>%
+#   filter(!is.na(population.density))  %>%
+#   filter(!is.na(gva.TOTAL_capita)) %>%
+#   make.pbalanced(balance.type = "shared.individuals") %>%
+#   as.data.frame() %>% arrange(id, time)
+# 
+# data4 %>% filter(rail == 1)
+
+# Carry out matching using the match MatchIt package
+# m.out <- matchit(rail ~ metro + urban + coast + port + time + gva.TOTAL_capita + population.density, data = data4, method = "nearest")
+# z.out <- zelig(log(road_freight) ~ rail + metro + urban + coast + port + time + gva.TOTAL_capita + population.density, 
+#                data = match.data(m.out, "control"), model = "ls")
+# x.out <- setx(z.out, data = match.data(m.out, "treat"), cond = TRUE)
+# s.out <- sim(z.out, x = x.out)
+# summary(s.out)
 
 # Preparing data set for synthetic control
 data4 <- data3 %>% filter(time >= 2000 & time < 2017) %>% #filter(country == "DE") %>% 
