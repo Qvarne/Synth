@@ -398,7 +398,7 @@ added6 %>% write.csv("added6.csv")
 added7 <- data2 %>% filter((geo %in% added6$geo)) 
 
 # Recode geo (continue here)
-added7 <- added7 %>% mutate(geo == ifelse(geo == "DE915", "DE91C", 
+added8 <- added7 %>% mutate(geo = ifelse(geo == "DE915", "DE91C",
                                           ifelse(geo == "DE919", "DE91C", 
                                                  ifelse(geo == "DEB16", "DEB1C", 
                                                         ifelse(geo == "DEB19", "DEB1D", 
@@ -407,7 +407,7 @@ added7 <- added7 %>% mutate(geo == ifelse(geo == "DE915", "DE91C",
                                                                              ifelse(geo == "FR211", "FRF21", 
                                                                                     ifelse(geo == "FR212", "FRF22", geo
                                                                                     ))))))))) %>%
-                      mutate(geo == ifelse(geo == "FR213", "FRF23", 
+                      mutate(geo = ifelse(geo == "FR213", "FRF23", 
                                            ifelse(geo == "FR214", "FRF24", 
                                                   ifelse(geo == "FR221", "FRE21", 
                                                          ifelse(geo == "FR222", "FRE22", 
@@ -423,7 +423,7 @@ added7 <- added7 %>% mutate(geo == ifelse(geo == "DE915", "DE91C",
                                                                                                                                ifelse(geo == "FR251", "FRD11", 
                                                                                                                                       ifelse(geo == "FR252", "FRD12",
                                                                                                                                              geo)))))))))))))))) %>%
-                      mutate(geo == ifelse(geo == "FR253", "FRD13", 
+                      mutate(geo = ifelse(geo == "FR253", "FRD13", 
                                            ifelse(geo == "FR261", "FRC11", 
                                                   ifelse(geo == "FR262", "FRC12", 
                                                          ifelse(geo == "FR263", "FRC13", 
@@ -439,7 +439,7 @@ added7 <- added7 %>% mutate(geo == ifelse(geo == "DE915", "DE91C",
                                                                                                                                ifelse(geo == "FR431", "FRC21", 
                                                                                                                                       ifelse(geo == "FR432", "FRC22",
                                                                                                                                              geo)))))))))))))))) %>%
-                      mutate(geo == ifelse(geo == "FR433", "FRC23", 
+                      mutate(geo = ifelse(geo == "FR433", "FRC23", 
                                            ifelse(geo == "FR434", "FRC24", 
                                                   ifelse(geo == "FR511", "FRG01", 
                                                          ifelse(geo == "FR512", "FRG02", 
@@ -455,7 +455,7 @@ added7 <- added7 %>% mutate(geo == ifelse(geo == "DE915", "DE91C",
                                                                                                                                ifelse(geo == "FR533", "FRI33", 
                                                                                                                                       ifelse(geo == "FR534", "FRI34",
                                                                                                                                              geo)))))))))))))))) %>%
-                        mutate(geo == ifelse(geo == "FR611", "FRI11", 
+                        mutate(geo = ifelse(geo == "FR611", "FRI11", 
                                            ifelse(geo == "FR612", "FRI12", 
                                                   ifelse(geo == "FR613", "FRI13", 
                                                          ifelse(geo == "FR614", "FRI14", 
@@ -471,7 +471,7 @@ added7 <- added7 %>% mutate(geo == ifelse(geo == "DE915", "DE91C",
                                                                                                                                ifelse(geo == "FR631", "FRI21", 
                                                                                                                                       ifelse(geo == "FR632", "FRI22",
                                                                                                                                              geo)))))))))))))))) %>%
-                        mutate(geo == ifelse(geo == "FR633", "FRI23", 
+                        mutate(geo = ifelse(geo == "FR633", "FRI23", 
                                            ifelse(geo == "FR711", "FRK21", 
                                                   ifelse(geo == "FR712", "FRK22", 
                                                          ifelse(geo == "FR713", "FRK23", 
@@ -487,7 +487,7 @@ added7 <- added7 %>% mutate(geo == ifelse(geo == "DE915", "DE91C",
                                                                                                                                ifelse(geo == "FR811", "FRJ11", 
                                                                                                                                       ifelse(geo == "FR812", "FRJ12",
                                                                                                                                              geo)))))))))))))))) %>%
-                        mutate(geo == ifelse(geo == "FR813", "FRJ13", 
+                        mutate(geo = ifelse(geo == "FR813", "FRJ13", 
                                            ifelse(geo == "FR814", "FRJ14", 
                                                   ifelse(geo == "FR815", "FRJ15", 
                                                          ifelse(geo == "FR821", "FRL01", 
@@ -503,7 +503,7 @@ added7 <- added7 %>% mutate(geo == ifelse(geo == "DE915", "DE91C",
                                                                                                                                ifelse(geo == "FRA30", "FRY30", 
                                                                                                                                       ifelse(geo == "FRA40", "FRY40",
                                                                                                                                              geo)))))))))))))))) %>%
-                        mutate(geo == ifelse(geo == "FRA50", "FRY50", 
+                        mutate(geo = ifelse(geo == "FRA50", "FRY50", 
                                            ifelse(geo == "HU101", "HU110", 
                                                   ifelse(geo == "HU102", "HU120", 
                                                          ifelse(geo == "IE011", "IE041", 
@@ -519,7 +519,7 @@ added7 <- added7 %>% mutate(geo == ifelse(geo == "DE915", "DE91C",
                                                                                                                                ifelse(geo == "LT003", "LT023", 
                                                                                                                                       ifelse(geo == "LT004", "LT024",
                                                                                                                                              geo)))))))))))))))) %>%
-                        mutate(geo == ifelse(geo == "LT005", "LT025", 
+                        mutate(geo = ifelse(geo == "LT005", "LT025", 
                                            ifelse(geo == "LT006", "LT026", 
                                                   ifelse(geo == "LT007", "LT027", 
                                                          ifelse(geo == "LT008", "LT028", 
@@ -551,7 +551,7 @@ added7 <- added7 %>% mutate(geo == ifelse(geo == "DE915", "DE91C",
                                                                                                                                  ifelse(geo == "PL314", "PL814", 
                                                                                                                                         ifelse(geo == "PL315", "PL815",
                                                                                                                                                geo)))))))))))))))) %>%
-                        mutate(geo == ifelse(geo == "PL323", "PL821", 
+                        mutate(geo = ifelse(geo == "PL323", "PL821", 
                                              ifelse(geo == "PL324", "PL822", 
                                                     ifelse(geo == "PL325", "PL823", 
                                                            ifelse(geo == "PL326", "PL824", 
@@ -567,7 +567,7 @@ added7 <- added7 %>% mutate(geo == ifelse(geo == "DE915", "DE91C",
                                                                                                                                  ifelse(geo == "UKM23", "UKM73", 
                                                                                                                                         ifelse(geo == "UKM24", "UKM74",
                                                                                                                                                geo)))))))))))))))) %>%
-                         mutate(geo == ifelse(geo == "UKM25", "UKM75", 
+                         mutate(geo = ifelse(geo == "UKM25", "UKM75", 
                                              ifelse(geo == "UKM26", "UKM76", 
                                                     ifelse(geo == "UKM27", "UKM77", 
                                                            ifelse(geo == "UKM28", "UKM78", 
@@ -582,7 +582,7 @@ added7 <- added7 %>% mutate(geo == ifelse(geo == "DE915", "DE91C",
                                                                                                                           ifelse(geo == "UKN01", "UKN06", 
                                                                                                                                  geo)))))))))))))) %>%
                                                                                                                                  
-                          mutate(geo == ifelse(geo == "UKN10", "", 
+                          mutate(geo = ifelse(geo == "UKN10", "", 
                                                            ifelse(geo == "UKN11", "", 
                                                                   ifelse(geo == "UKN12", "", 
                                                                          ifelse(geo == "UKN13", "", 
@@ -591,7 +591,9 @@ added7 <- added7 %>% mutate(geo == ifelse(geo == "DE915", "DE91C",
                                                                                               ifelse(geo == "", "UKN16",
                                                                                                      geo))))))))
 
-data2 %>% filter(geo == "UKN07")
+test <- added8 %>% group_by(geo, time) %>% summarise(sum(population))
+test %>% filter(geo == "DE91C")
+data2 %>% filter(geo == "DE91C")
 
 # Drop discontinued NUTS-3 codes
 data2 <- data2 %>% filter(!(geo %in% c("DE411","DE412","DE413","DE414","DE415","DE416","DE417","DE418","DE421","DE422","DE423","DE424","DE425","DE426",
