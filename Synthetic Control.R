@@ -395,18 +395,27 @@ added6 <- added6[nchar(added6$geo)  == 5, ] %>% arrange(geo)
 added6 %>% write.csv("added6.csv")
 
 # Find a way to join continued and discontinued NUTS 3 codes (try a join)
-added7 <- data2 %>% filter((geo %in% added6$geo)) 
+# Find a way to sumarise all and keep rest
+# Find a wy to join and replace NAs
+added7 <- data2 %>% filter(geo %in% added6$geo) %>% filter(geo %in% c("DE915","DE919","NO061","NO062"))   %>% 
+  mutate(geo = ifelse(geo == "DE915", "DE91C", 
+                      ifelse(geo == "DE919", "DE91C", 
+                             ifelse(geo == "NO061", "NO060", 
+                                    ifelse(geo == "NO062", "NO060", geo))))) %>% group_by(geo, time) %>% arrange(geo, time)
+  
+  data2 %>% filter(geo == "NO062") %>% print(added7, n = 100L)
 
+colnames(added7)
 # Recode geo (continue here)
-added8 <- added7 %>% mutate(geo = ifelse(geo == "DE915", "DE91C",
-                                          ifelse(geo == "DE919", "DE91C", 
-                                                 ifelse(geo == "DEB16", "DEB1C", 
-                                                        ifelse(geo == "DEB19", "DEB1D", 
+added8 <- data2 %>% filter(geo %in% added6$geo) %>% 
+  filter(!(geo %in% c("UKN02","UKN03","UKN03","UKN04","UKN05","DE915","DE919","NO061","NO062"))) %>% # UKN01 to UKN05 have been redrawn,; rest in added7
+                     mutate(geo = ifelse(geo == "DEB16", "DEB1C", 
+                                        ifelse(geo == "DEB19", "DEB1D", 
                                                                ifelse(geo == "FI1D4", "FI1D8", 
                                                                       ifelse(geo == "FI1D6", "FI1D9", 
                                                                              ifelse(geo == "FR211", "FRF21", 
                                                                                     ifelse(geo == "FR212", "FRF22", geo
-                                                                                    ))))))))) %>%
+                                                                                    ))))))) %>%
                       mutate(geo = ifelse(geo == "FR213", "FRF23", 
                                            ifelse(geo == "FR214", "FRF24", 
                                                   ifelse(geo == "FR221", "FRE21", 
@@ -560,13 +569,11 @@ added8 <- added7 %>% mutate(geo = ifelse(geo == "DE915", "DE91C",
                                                                                 ifelse(geo == "PL343", "PL841", 
                                                                                        ifelse(geo == "PL344", "PL842", 
                                                                                               ifelse(geo == "PL345", "PL843", 
-                                                                                                     ifelse(geo == "NO061", "NO060", 
-                                                                                                            ifelse(geo == "NO062", "NO060", 
                                                                                                                    ifelse(geo == "UKM21", "UKM71", 
                                                                                                                           ifelse(geo == "UKM22", "UKM72", 
                                                                                                                                  ifelse(geo == "UKM23", "UKM73", 
                                                                                                                                         ifelse(geo == "UKM24", "UKM74",
-                                                                                                                                               geo)))))))))))))))) %>%
+                                                                                                                                               geo)))))))))))))) %>%
                          mutate(geo = ifelse(geo == "UKM25", "UKM75", 
                                              ifelse(geo == "UKM26", "UKM76", 
                                                     ifelse(geo == "UKM27", "UKM77", 
@@ -580,19 +587,10 @@ added8 <- added7 %>% mutate(geo = ifelse(geo == "DE915", "DE91C",
                                                                                                             ifelse(geo == "UKM37", "UKM94", 
                                                                                                                    ifelse(geo == "UKM38", "UKM95", 
                                                                                                                           ifelse(geo == "UKN01", "UKN06", 
-                                                                                                                                 geo)))))))))))))) %>%
-                                                                                                                                 
-                          mutate(geo = ifelse(geo == "UKN10", "", 
-                                                           ifelse(geo == "UKN11", "", 
-                                                                  ifelse(geo == "UKN12", "", 
-                                                                         ifelse(geo == "UKN13", "", 
-                                                                                ifelse(geo == "UKN14", "", 
-                                                                                       ifelse(geo == "UKN15", "", 
-                                                                                              ifelse(geo == "", "UKN16",
-                                                                                                     geo))))))))
+                                                                                                                                 geo)))))))))))))) 
 
 test <- added8 %>% group_by(geo, time) %>% summarise(sum(population))
-test %>% filter(geo == "DE91C")
+added7 %>% filter(geo == "DE91C")
 data2 %>% filter(geo == "DE91C")
 
 # Drop discontinued NUTS-3 codes
