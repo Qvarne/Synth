@@ -1,3 +1,4 @@
+# Load necessary packages
 library(eurostat)
 library(dplyr)
 library(stringr)
@@ -25,7 +26,6 @@ library(stargazer)
 library(Zelig)
 library(cem)
 
-# version
 # Load data from Eurostat (NUTS 3)
 data <- get_eurostat(id = "demo_r_d3dens", time_format = "num") %>%
   rename(population.density = values) %>%
@@ -397,15 +397,13 @@ added6 %>% write.csv("added6.csv")
 # Find a way to join continued and discontinued NUTS 3 codes (try a join)
 # Find a way to sumarise all and keep rest
 # Find a wy to join and replace NAs
-added7 <- data2 %>% filter(geo %in% added6$geo) %>% filter(geo %in% c("DE915","DE919","NO061","NO062"))   %>% 
-  mutate(geo = ifelse(geo == "DE915", "DE91C", 
-                      ifelse(geo == "DE919", "DE91C", 
-                             ifelse(geo == "NO061", "NO060", 
-                                    ifelse(geo == "NO062", "NO060", geo))))) %>% group_by(geo, time) %>% arrange(geo, time)
+# added7 <- data2 %>% filter(geo %in% added6$geo) %>% filter(geo %in% c("DE915","DE919","NO061","NO062"))   %>% 
+#   mutate(geo = ifelse(geo == "DE915", "DE91C", 
+#                       ifelse(geo == "DE919", "DE91C", 
+#                              ifelse(geo == "NO061", "NO060", 
+#                                     ifelse(geo == "NO062", "NO060", geo))))) %>% group_by(geo, time) %>% arrange(geo, time)
   
-  data2 %>% filter(geo == "NO062") %>% print(added7, n = 100L)
 
-colnames(added7)
 # Recode geo (continue here)
 added8 <- data2 %>% filter(geo %in% added6$geo) %>% 
   filter(!(geo %in% c("UKN02","UKN03","UKN03","UKN04","UKN05","DE915","DE919","NO061","NO062"))) %>% # UKN01 to UKN05 have been redrawn,; rest in added7
@@ -588,6 +586,30 @@ added8 <- data2 %>% filter(geo %in% added6$geo) %>%
                                                                                                                    ifelse(geo == "UKM38", "UKM95", 
                                                                                                                           ifelse(geo == "UKN01", "UKN06", 
                                                                                                                                  geo)))))))))))))) 
+coalesce.all <- function(x) {
+  x = colnames()
+}
+
+test <- data2 %>% 
+  left_join(added8, by = c("geo","time"), suffix = c("", ".y")) %>%
+  mutate(road_freight = coalesce(road_freight, road_freight.y))
+
+colnames(data2[ , 3:132])
+
+as.factor(colnames(test[ , 3:132]))
+
+for (x in as.factor(colnames(test[ , 3:132]))) {
+  y = as.factor(colnames(test[ , 133:262]))
+  mutate(test, x = coalesce(x, y))
+}
+
+rlang::last_error()
+
+  # select(-var2.x, -var2.y)
+  
+lapply(colnames(data2[ , 3:132]), mutate())
+summary(test$road_freight)
+summary(data2$road_freight)
 
 test <- added8 %>% group_by(geo, time) %>% summarise(sum(population))
 added7 %>% filter(geo == "DE91C")
