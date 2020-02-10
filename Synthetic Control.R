@@ -586,34 +586,11 @@ added8 <- data2 %>% filter(geo %in% added6$geo) %>%
                                                                                                                    ifelse(geo == "UKM38", "UKM95", 
                                                                                                                           ifelse(geo == "UKN01", "UKN06", 
                                                                                                                                  geo)))))))))))))) 
-coalesce.all <- function(x) {
-  x = colnames()
-}
 
-test <- data2 %>% 
-  left_join(added8, by = c("geo","time"), suffix = c("", ".y")) %>%
-  mutate(road_freight = coalesce(road_freight, road_freight.y))
-
-colnames(data2[ , 3:132])
-
-as.factor(colnames(test[ , 3:132]))
-
-for (x in as.factor(colnames(test[ , 3:132]))) {
-  y = as.factor(colnames(test[ , 133:262]))
-  mutate(test, x = coalesce(x, y))
-}
-
-rlang::last_error()
-
-  # select(-var2.x, -var2.y)
-  
-lapply(colnames(data2[ , 3:132]), mutate())
-summary(test$road_freight)
+data2 <- data2 %>% left_join(added8, by = c("geo", "time"), suffix = c("","_extra")) %>% select(-c(263)) %>% split.default(str_remove(names(.), "_extra")) %>%
+  map_df(~ coalesce(!!! .x)) %>%
+  bind_cols(., select(test, ends_with("_extra"))) %>% select(geo, time, everything()) %>% select(1:132)
 summary(data2$road_freight)
-
-test <- added8 %>% group_by(geo, time) %>% summarise(sum(population))
-added7 %>% filter(geo == "DE91C")
-data2 %>% filter(geo == "DE91C")
 
 # Drop discontinued NUTS-3 codes
 data2 <- data2 %>% filter(!(geo %in% c("DE411","DE412","DE413","DE414","DE415","DE416","DE417","DE418","DE421","DE422","DE423","DE424","DE425","DE426",
@@ -662,7 +639,7 @@ data3 <- data2  %>% mutate(gva.TOTAL_capita = gva.TOTAL*1000/population) %>%
   mutate(employment.TOTAL_capita = employment.TOTAL/population) %>%
   mutate(gdp.EUR_HAB = as.numeric(gdp.EUR_HAB)) %>% as.data.table() %>% select(-c("na.rm")) %>% mutate(employment.TOTAL.NUTS.2.log = log(employment.TOTAL.NUTS.2)) %>%
   mutate(hours.worked.M_N.share = hours.worked.M_N/hours.worked.TOTAL) %>% mutate(hours.worked.G_I.share = hours.worked.G_I/hours.worked.TOTAL) %>%
-  mutate(hours.worked.TOTAL.capita = hours.worked.TOTAL/population.NUTS.2)
+  mutate(hours.worked.TOTAL.capita = hours.worked.TOTAL/population.NUTS.2) %>% mutate(employment.TOTAL.NUTS.2_capita = employment.TOTAL.NUTS.2/population.NUTS.2)
 # Create id
 data3$id <- data3 %>% group_by(geo) %>% group_indices()
 data3$id.NUTS.2 <- data3 %>% group_by(nuts.2) %>% group_indices()
@@ -762,18 +739,18 @@ data3 <- data3 %>% mutate(rail = ifelse(geo == "DEA12" & time >= 2011, 1,
 
 # Preparing data set for synthetic control
 data4 <- data3 %>% filter(time >= 2000 & time < 2017) %>% #filter(country == "DE") %>% 
-  distinct(id, time, .keep_all= TRUE) %>% group_by(id) %>%
+  distinct(id.NUTS.2, time, .keep_all= TRUE) %>%
   mutate(treatment = ifelse(time >= 2011, 1, 0)) %>%
-  group_by(id, treatment) %>%
+  group_by(id.NUTS.2, treatment) %>%
   mutate(mean_gva.B_E_F_share = ifelse(time < 2011 & is.na(gva.B_E_F_share), mean(gva.B_E_F_share, na.rm = TRUE), gva.B_E_F_share)) %>%
   mutate(mean_trade.mark = ifelse(time < 2011 & is.na(trade.mark), mean(trade.mark, na.rm = TRUE), trade.mark)) %>%
   mutate(mean_gva.TOTAL_capita = ifelse(time < 2011 & is.na(gva.TOTAL_capita), mean(gva.TOTAL_capita, na.rm = TRUE), gva.TOTAL_capita)) %>%
   mutate(mean_population = ifelse(time < 2011 & is.na(population), mean(population, na.rm = TRUE), population)) %>%
-  mutate(mean_gdp_share = ifelse(time < 2011 & is.na(gdp_share), mean(gdp_share, na.rm = TRUE), gdp_share)) %>% group_by(id) %>%
-  mutate(mean_population.density = ifelse(time < 2011 & is.na(population.density), mean(population.density, na.rm = TRUE), population.density)) %>% group_by(id) %>%
-  filter(!is.na(id)) %>%
-  filter(!is.na(employment.TOTAL)) %>%
-  filter(!is.na(geo)) %>%
+  mutate(mean_gdp_share = ifelse(time < 2011 & is.na(gdp_share), mean(gdp_share, na.rm = TRUE), gdp_share)) %>%
+  mutate(mean_population.density = ifelse(time < 2011 & is.na(population.density), mean(population.density, na.rm = TRUE), population.density)) %>% group_by(id.NUTS.2) %>%
+  filter(!is.na(id.NUTS.2)) %>%
+  filter(!is.na(employment.TOTAL.NUTS.2_capita)) %>%
+  filter(!is.na(nuts.2)) %>%
   filter(!is.na(time)) %>%
   filter(!is.na(mean_gva.B_E_F_share)) %>%
   filter(!is.na(mean_population)) %>%
@@ -783,10 +760,10 @@ data4 <- data3 %>% filter(time >= 2000 & time < 2017) %>% #filter(country == "DE
   filter(!is.na(mean_population.density)) %>%
   as.data.frame() %>% 
   select(c(
-           "employment.TOTAL", 
-           "id",
+           "employment.TOTAL.NUTS.2_capita", 
+           "id.NUTS.2",
            "time",
-           "geo",
+           "nuts.2",
            "nuts.2",
            "mean_gva.B_E_F_share",
            "mean_population",
@@ -795,17 +772,16 @@ data4 <- data3 %>% filter(time >= 2000 & time < 2017) %>% #filter(country == "DE
            "mean_population.density",
            "mean_gdp_share"
            )) %>%
-  distinct(id, time, .keep_all= TRUE) %>% select(id, time, everything())
+  distinct(id.NUTS.2, time, .keep_all= TRUE) %>% select(id.NUTS.2, time, everything())
 
 
 data5 <- make.pbalanced(data4, balance.type = "shared.individuals")
-data3 %>% filter(nuts.2 == "DE60", time == "2011") %>% select(id)
-data5 %>% filter(id == "403")
-b <- unique(data5$id)
 
-# c <- b[!b %in%  c(578:584)]
-c <- b[!b %in%  c(322,402:416)]
+b <- unique(data5$id.NUTS.2)
 
+c <- b[!b %in%  c(69,60)]
+
+summary(data5$time)
 
 # Run synthetic control estimation and plot results
 dataprep.out<-
@@ -813,47 +789,47 @@ dataprep.out<-
     foo = data5,
     predictors = c(
       "mean_gva.B_E_F_share",
-      "mean_population",
+      # "mean_population",
       "mean_trade.mark",
       "mean_gva.TOTAL_capita",
       "mean_population.density",
       "mean_gdp_share"
                    ),
     predictors.op = "mean",
-    dependent = "employment.TOTAL",
-    unit.variable = c("id"),
+    dependent = "employment.TOTAL.NUTS.2_capita",
+    unit.variable = c("id.NUTS.2"),
     time.variable = c("time"),
     special.predictors = list(
-      list("employment.TOTAL", 2000, "mean"),
-      # list("employment.TOTAL", 2001, "mean"),
-      # list("employment.TOTAL", 2002, "mean"),
-      # list("employment.TOTAL", 2003, "mean"),
-      list("employment.TOTAL", 2004, "mean"),
-      # list("employment.TOTAL", 2005, "mean"),
-      # list("employment.TOTAL", 2006, "mean"),
-      # list("employment.TOTAL", 2007, "mean"),
-      # list("employment.TOTAL", 2008, "mean"),
-      # list("employment.TOTAL", 2009, "mean"),
-      list("employment.TOTAL", 2010, "mean")
+      list("employment.TOTAL.NUTS.2_capita", 2000, "mean"),
+      # list("employment.TOTAL.NUTS.2_capita", 2001, "mean"),
+      # list("employment.TOTAL.NUTS.2_capita", 2002, "mean"),
+      # list("employment.TOTAL.NUTS.2_capita", 2003, "mean"),
+      # list("employment.TOTAL.NUTS.2_capita", 2004, "mean"),
+      list("employment.TOTAL.NUTS.2_capita", 2005, "mean"),
+      # list("employment.TOTAL.NUTS.2_capita", 2006, "mean"),
+      # list("employment.TOTAL.NUTS.2_capita", 2007, "mean"),
+      # list("employment.TOTAL.NUTS.2_capita", 2008, "mean"),
+      # list("employment.TOTAL.NUTS.2_capita", 2009, "mean"),
+      list("employment.TOTAL.NUTS.2_capita", 2010, "mean")
     ),
-    treatment.identifier = 403,
+    treatment.identifier = 69,
     controls.identifier = c,
     time.predictors.prior = c(2000:2011),
     time.optimize.ssr = c(2000:2011),
-    unit.names.variable = "geo",
+    unit.names.variable = "nuts.2",
     time.plot = 2000:2016
   )
 
 
-employment.TOTAL.out <- synth(dataprep.out) # verbose = TRUE, optimxmethod = "All")
+employment.TOTAL.NUTS.2_capita.out <- synth(dataprep.out) # verbose = TRUE, optimxmethod = "All")
 
-synth.tables <- synth.tab(dataprep.res = dataprep.out,synth.res = employment.TOTAL.out)
+synth.tables <- synth.tab(dataprep.res = dataprep.out,synth.res = employment.TOTAL.NUTS.2_capita.out)
 print(synth.tables$tab.pred)
 print(synth.tables$tab.v)
 test <- synth.tables$tab.w %>% filter(w.weights > 0)
 print(synth.tables$tab.w %>% filter(w.weights > 0))
 
-path.plot(synth.res = employment.TOTAL.out,
+path.plot(synth.res = employment.TOTAL.NUTS.2_capita.out,
           dataprep.res = dataprep.out,
           tr.intake = 2011,
           Ylab = c("Employment (thousand persons)"),
