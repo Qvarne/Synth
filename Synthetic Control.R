@@ -405,7 +405,7 @@ added6 %>% write.csv("added6.csv")
   
 
 # Recode geo (continue here)
-added8 <- data2 %>% filter(geo %in% added6$geo) %>% 
+added8 <- data2 %>% filter(geo %in% added6$geo) %>%
   filter(!(geo %in% c("UKN02","UKN03","UKN03","UKN04","UKN05","DE915","DE919","NO061","NO062"))) %>% # UKN01 to UKN05 have been redrawn,; rest in added7
                      mutate(geo = ifelse(geo == "DEB16", "DEB1C", 
                                         ifelse(geo == "DEB19", "DEB1D", 
@@ -542,7 +542,7 @@ added8 <- data2 %>% filter(geo %in% added6$geo) %>%
                                                                                                                                ifelse(geo == "PL113", "PL711", 
                                                                                                                                       ifelse(geo == "PL114", "PL712",
                                                                                                                                              geo)))))))))))))))) %>%
-                        mutate(geo == ifelse(geo == "PL115", "PL713", 
+                        mutate(geo = ifelse(geo == "PL115", "PL713", 
                                              ifelse(geo == "PL116", "PL714", 
                                                     ifelse(geo == "PL117", "PL715", 
                                                            ifelse(geo == "PL127", "PL911", 
@@ -587,10 +587,10 @@ added8 <- data2 %>% filter(geo %in% added6$geo) %>%
                                                                                                                           ifelse(geo == "UKN01", "UKN06", 
                                                                                                                                  geo)))))))))))))) 
 
-data2 <- data2 %>% left_join(added8, by = c("geo", "time"), suffix = c("","_extra")) %>% select(-c(263)) %>% split.default(str_remove(names(.), "_extra")) %>%
-  map_df(~ coalesce(!!! .x)) %>%
-  bind_cols(., select(test, ends_with("_extra"))) %>% select(geo, time, everything()) %>% select(1:132)
-summary(data2$road_freight)
+ 
+data2 <- data2 %>% full_join(added8, by = c("geo", "time"), suffix = c("","_extra")) %>% select(-c(263)) %>% split.default(str_remove(names(.), "_extra")) %>%
+  map_df(~ coalesce(!!! .x)) %>% select(geo, time, everything()) %>% select(1:132)
+
 
 # Drop discontinued NUTS-3 codes
 data2 <- data2 %>% filter(!(geo %in% c("DE411","DE412","DE413","DE414","DE415","DE416","DE417","DE418","DE421","DE422","DE423","DE424","DE425","DE426",
@@ -650,56 +650,56 @@ data3 <- data3 %>% to_dummy(country, suffix = "label") %>% bind_cols(data3)
 data3 %>% filter(geo == "EL307") %>% select(id)
 
 
-# Evaluate different variables' behavior over time
-ggarrange(
-  data3 %>% filter(id == "584") %>% distinct(id, time, .keep_all= TRUE) %>% 
-    ggplot(aes(x = time)) + 
-      geom_line(aes(y = road_freight)) +
-      ylab(expression(atop("Road freight", paste("(thousand tonnes)")))) +
-      geom_vline(aes(xintercept = 2009), linetype = "dotted"),
-  data3 %>% filter(id == "584") %>% distinct(id, time, .keep_all= TRUE) %>% 
-    ggplot(aes(x = time)) + 
-    geom_line(aes(y = employment.TOTAL)) +
-    ylab(expression(atop("Employment", paste("(thousand persons)")))) +
-    geom_vline(aes(xintercept = 2009), linetype = "dotted"),
-  data3 %>% filter(id == "584") %>% distinct(id, time, .keep_all= TRUE) %>% 
-    ggplot(aes(x = time)) + 
-    geom_line(aes(y = employment.TOTAL/population)) +
-    ylab(expression(atop("Employment per capita", paste("(rate)")))) +
-    geom_vline(aes(xintercept = 2009), linetype = "dotted"),
-  data3 %>% filter(id == "584") %>% distinct(id, time, .keep_all= TRUE) %>% 
-    ggplot(aes(x = time)) + 
-    geom_line(aes(y = population)) +
-    ylab(expression(atop("Population", paste("thousand persons")))) +
-    geom_vline(aes(xintercept = 2009), linetype = "dotted"),
-  data3 %>% filter(id == "584") %>% distinct(id, time, .keep_all= TRUE) %>% 
-    ggplot(aes(x = time)) + 
-    geom_line(aes(y = gva.TOTAL)) +
-    ylab(expression(atop("Gross value added", paste("thousand euros")))) +
-    geom_vline(aes(xintercept = 2009), linetype = "dotted"),
-  data3 %>% filter(id == "584") %>% distinct(id, time, .keep_all= TRUE) %>% 
-    ggplot(aes(x = time)) + 
-    geom_line(aes(y = gva.TOTAL/population)) +
-    ylab(expression(atop("Gross value added per capita", paste("rate")))) +
-    geom_vline(aes(xintercept = 2009), linetype = "dotted")
-,ncol = 2, nrow = 4)
-
-data3 %>% filter(country == "EL") %>% ggplot(aes(x=time,colour=factor(id))) + geom_line(aes(y=employment.TOTAL)) +
-  gghighlight(geo == "EL307")
-
-# Fit regression to justify predictor variable selection
-lm.test <- data3 %>% lm(employment.TOTAL ~ population + population.density + coast + urban + port + metro + gva.TOTAL_capita + gva.B_E_F_share + trade.mark + 
-                          gdp_share, .) 
-lm.test %>% summary() %>% print() %>% bptest()
-lm.test.robust <- lm.test %>% coeftest(vcov = vcovHC(.)) %>% print()
-# data3 %>% lmrob(employment.TOTAL ~ population + population.density + coast + urban + port + metro + gva.TOTAL_capita + gva.B_E_F_share + trade.mark, .) %>% summary()
-
-plm.test <- data3 %>% distinct(id, time, .keep_all= TRUE) %>% make.pbalanced(balance.type = "shared.individuals") %>% 
-  plm(log(employment.TOTAL) ~ population + population.density + gva.TOTAL_capita + gva.B_E_F_share + trade.mark + gdp_share + lag(log(employment.TOTAL)),
-              index = c("id","time"), model="within", effect="twoways", data = .) 
-plm.test %>% summary() %>% print() %>% bptest() 
-plm.test.robust <- plm.test %>% coeftest(((length(unique(data3$id)))/(length(unique(data3$id)) - 1)) * vcovHC(., type="HC1", cluster="group")) %>% print()
-stargazer(plm.test)
+# # Evaluate different variables' behavior over time
+# ggarrange(
+#   data3 %>% filter(id == "584") %>% distinct(id, time, .keep_all= TRUE) %>% 
+#     ggplot(aes(x = time)) + 
+#       geom_line(aes(y = road_freight)) +
+#       ylab(expression(atop("Road freight", paste("(thousand tonnes)")))) +
+#       geom_vline(aes(xintercept = 2009), linetype = "dotted"),
+#   data3 %>% filter(id == "584") %>% distinct(id, time, .keep_all= TRUE) %>% 
+#     ggplot(aes(x = time)) + 
+#     geom_line(aes(y = employment.TOTAL)) +
+#     ylab(expression(atop("Employment", paste("(thousand persons)")))) +
+#     geom_vline(aes(xintercept = 2009), linetype = "dotted"),
+#   data3 %>% filter(id == "584") %>% distinct(id, time, .keep_all= TRUE) %>% 
+#     ggplot(aes(x = time)) + 
+#     geom_line(aes(y = employment.TOTAL/population)) +
+#     ylab(expression(atop("Employment per capita", paste("(rate)")))) +
+#     geom_vline(aes(xintercept = 2009), linetype = "dotted"),
+#   data3 %>% filter(id == "584") %>% distinct(id, time, .keep_all= TRUE) %>% 
+#     ggplot(aes(x = time)) + 
+#     geom_line(aes(y = population)) +
+#     ylab(expression(atop("Population", paste("thousand persons")))) +
+#     geom_vline(aes(xintercept = 2009), linetype = "dotted"),
+#   data3 %>% filter(id == "584") %>% distinct(id, time, .keep_all= TRUE) %>% 
+#     ggplot(aes(x = time)) + 
+#     geom_line(aes(y = gva.TOTAL)) +
+#     ylab(expression(atop("Gross value added", paste("thousand euros")))) +
+#     geom_vline(aes(xintercept = 2009), linetype = "dotted"),
+#   data3 %>% filter(id == "584") %>% distinct(id, time, .keep_all= TRUE) %>% 
+#     ggplot(aes(x = time)) + 
+#     geom_line(aes(y = gva.TOTAL/population)) +
+#     ylab(expression(atop("Gross value added per capita", paste("rate")))) +
+#     geom_vline(aes(xintercept = 2009), linetype = "dotted")
+# ,ncol = 2, nrow = 4)
+# 
+# data3 %>% filter(country == "EL") %>% ggplot(aes(x=time,colour=factor(id))) + geom_line(aes(y=employment.TOTAL)) +
+#   gghighlight(geo == "EL307")
+# 
+# # Fit regression to justify predictor variable selection
+# lm.test <- data3 %>% lm(employment.TOTAL ~ population + population.density + coast + urban + port + metro + gva.TOTAL_capita + gva.B_E_F_share + trade.mark + 
+#                           gdp_share, .) 
+# lm.test %>% summary() %>% print() %>% bptest()
+# lm.test.robust <- lm.test %>% coeftest(vcov = vcovHC(.)) %>% print()
+# # data3 %>% lmrob(employment.TOTAL ~ population + population.density + coast + urban + port + metro + gva.TOTAL_capita + gva.B_E_F_share + trade.mark, .) %>% summary()
+# 
+# plm.test <- data3 %>% distinct(id, time, .keep_all= TRUE) %>% make.pbalanced(balance.type = "shared.individuals") %>% 
+#   plm(log(employment.TOTAL) ~ population + population.density + gva.TOTAL_capita + gva.B_E_F_share + trade.mark + gdp_share + lag(log(employment.TOTAL)),
+#               index = c("id","time"), model="within", effect="twoways", data = .) 
+# plm.test %>% summary() %>% print() %>% bptest() 
+# plm.test.robust <- plm.test %>% coeftest(((length(unique(data3$id)))/(length(unique(data3$id)) - 1)) * vcovHC(., type="HC1", cluster="group")) %>% print()
+# stargazer(plm.test)
 
 # Revisit matching
 # Define treatment variable
@@ -712,32 +712,45 @@ data3 <- data3 %>% mutate(rail = ifelse(geo == "DEA12" & time >= 2011, 1,
                                                                          ifelse(geo == "ES300" & time >= 2014, 1, 0))))))))
 
 # Prepare data for matching
-# data4 <- data3 %>% select(c("rail","metro","urban","coast","port","time","gva.TOTAL_capita","population.density","gva.TOTAL_capita","id","geo")) %>% 
-#   filter(time >= 2011 & time <= 2016) %>%
-#   group_by(id) %>% 
-#   filter(!is.na(rail)) %>%
-#   filter(!is.na(metro)) %>%
-#   filter(!is.na(urban)) %>%
-#   filter(!is.na(coast)) %>%
-#   filter(!is.na(port)) %>%
-#   filter(!is.na(time)) %>%
-#   filter(!is.na(gva.TOTAL_capita)) %>%
-#   filter(!is.na(population.density))  %>%
-#   filter(!is.na(gva.TOTAL_capita)) %>%
-#   make.pbalanced(balance.type = "shared.individuals") %>%
-#   as.data.frame() %>% arrange(id, time)
-# 
-# data4 %>% filter(rail == 1)
+# Continue here; work out matching
+data4 <- data3 %>% select(c("rail",
+                            "metro",
+                            "urban",
+                            "road_freight",
+                            "coast",
+                            # "port",
+                            "time",
+                            "gva.TOTAL_capita",
+                            "population.density",
+                            "id",
+                            "geo")) %>%
+  filter(time >= 2011 & time <= 2017) %>%
+  group_by(id) %>%
+  filter(!is.na(rail)) %>%
+  filter(!is.na(metro)) %>%
+  filter(!is.na(urban)) %>%
+  filter(!is.na(coast)) %>%
+  filter(!is.na(road_freight)) %>%
+  # filter(!is.na(port)) %>%
+  filter(!is.na(time)) %>%
+  filter(!is.na(gva.TOTAL_capita)) %>%
+  filter(!is.na(population.density))  %>%
+  make.pbalanced(balance.type = "shared.individuals") %>%
+  as.data.frame() %>% arrange(id, time)
+
+data3 %>% filter(geo == "PL127") %>% select(road_freight, time)
+data4 %>% filter(rail == 1)
 
 # Carry out matching using the match MatchIt package
-# m.out <- matchit(rail ~ metro + urban + coast + port + time + gva.TOTAL_capita + population.density, data = data4, method = "nearest")
-# z.out <- zelig(log(road_freight) ~ rail + metro + urban + coast + port + time + gva.TOTAL_capita + population.density, 
-#                data = match.data(m.out, "control"), model = "ls")
-# x.out <- setx(z.out, data = match.data(m.out, "treat"), cond = TRUE)
-# s.out <- sim(z.out, x = x.out)
-# summary(s.out)
+m.out <- matchit(rail ~ metro + urban + coast + time + population.density + gva.TOTAL_capita, data = data4, method = "nearest", distance = "logit", exact = c("time"))
+m.data <- match.data(m.out, group = "all")
+z.out <- zelig(road_freight ~ rail + metro + urban + coast + time + population.density + gva.TOTAL_capita, data = m.data, model = "ls")
+x.out <- setx(z.out, rail = 0)
+x1.out <- setx(z.out, rail = 1)
+s.out <- sim(z.out, x = x.out, x1 = x1.out)
+summary(s.out)
 
-# Preparing data set for synthetic control
+ # Preparing data set for synthetic control
 data4 <- data3 %>% filter(time >= 2000 & time < 2017) %>% #filter(country == "DE") %>% 
   distinct(id.NUTS.2, time, .keep_all= TRUE) %>%
   mutate(treatment = ifelse(time >= 2011, 1, 0)) %>%
