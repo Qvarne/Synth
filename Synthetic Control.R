@@ -26,6 +26,7 @@ library(stargazer)
 library(Zelig)
 library(cem)
 library(mice)
+library(optmatch)
 
 # Load data from Eurostat (NUTS 3)
 data <- get_eurostat(id = "demo_r_d3dens", time_format = "num") %>%
@@ -154,7 +155,9 @@ data <- get_eurostat(id = "demo_r_d3dens", time_format = "num") %>%
   left_join(get_eurostat(id = "ipr_ta_reg", time_format = "num", filters = list(unit = "NR")), 
             by = c("geo","time")) %>% rename(trade.mark  = values) %>%
   left_join(get_eurostat(id = "demo_r_pjanind3", time_format = "num", filters = list(indic_de = "DEPRATIO1", unit = "PC")), 
-            by = c("geo","time")) %>% rename(dependency.ratio  = values) %>% select(-indic_de)
+            by = c("geo","time")) %>% rename(dependency.ratio  = values) %>% select(-indic_de) %>% 
+  left_join(get_eurostat(id = "demo_r_pjanaggr3", time_format = "num", filters = list(age = "TOTAL", sex = "T", unit = "NR")), 
+            by = c("geo","time")) %>% rename(demo_r_pjanaggr3.TOTAL  = values) %>% select(-c("indic_de","") 
   
 # Drop unit identifiers
 
@@ -639,7 +642,7 @@ data3 <- data2  %>% mutate(gva.TOTAL_capita = gva.TOTAL*1000/population) %>%
   mutate(employment.TOTAL_capita = employment.TOTAL/population) %>%
   mutate(gdp.EUR_HAB = as.numeric(gdp.EUR_HAB)) %>% as.data.table() %>% select(-c("na.rm")) %>% mutate(employment.TOTAL.NUTS.2.log = log(employment.TOTAL.NUTS.2)) %>%
   mutate(hours.worked.M_N.share = hours.worked.M_N/hours.worked.TOTAL) %>% mutate(hours.worked.G_I.share = hours.worked.G_I/hours.worked.TOTAL) %>%
-  mutate(hours.worked.TOTAL.capita = hours.worked.TOTAL/population.NUTS.2) %>% mutate(employment.TOTAL.NUTS.2_capita = employment.TOTAL.NUTS.2/population.NUTS.2)
+  mutate(hours.worked.TOTAL.capita = hours.worked.TOTAL/population.NUTS.2) %>% mutate(employment.TOTAL.NUTS.2_capita = employment.TOTAL.NUTS.2/population.NUTS.2) 
 
 # Create id
 data3$id <- data3 %>% group_by(geo) %>% group_indices()
@@ -648,9 +651,9 @@ data3$id.NUTS.2 <- data3 %>% group_by(nuts.2) %>% group_indices()
 # Creat country dummies
 data3 <- data3 %>% to_dummy(country, suffix = "label") %>% bind_cols(data3) 
 
-data3 %>% filter(geo == "EL307") %>% select(id)
+data3 <- data3 %>% group_by(id) %>% mutate(pop.growth = ((population/dplyr::lead(population, order_by = id)-1)*100))
 
-
+data3 %>% filter(geo == "DEA12") %>% select(time, population, pop.growth)
 # # Evaluate different variables' behavior over time
 # ggarrange(
 #   data3 %>% filter(id == "584") %>% distinct(id, time, .keep_all= TRUE) %>% 
@@ -688,19 +691,6 @@ data3 %>% filter(geo == "EL307") %>% select(id)
 # data3 %>% filter(country == "EL") %>% ggplot(aes(x=time,colour=factor(id))) + geom_line(aes(y=employment.TOTAL)) +
 #   gghighlight(geo == "EL307")
 # 
-# # Fit regression to justify predictor variable selection
-# lm.test <- data3 %>% lm(employment.TOTAL ~ population + population.density + coast + urban + port + metro + gva.TOTAL_capita + gva.B_E_F_share + trade.mark + 
-#                           gdp_share, .) 
-# lm.test %>% summary() %>% print() %>% bptest()
-# lm.test.robust <- lm.test %>% coeftest(vcov = vcovHC(.)) %>% print()
-# # data3 %>% lmrob(employment.TOTAL ~ population + population.density + coast + urban + port + metro + gva.TOTAL_capita + gva.B_E_F_share + trade.mark, .) %>% summary()
-# 
-# plm.test <- data3 %>% distinct(id, time, .keep_all= TRUE) %>% make.pbalanced(balance.type = "shared.individuals") %>% 
-#   plm(log(employment.TOTAL) ~ population + population.density + gva.TOTAL_capita + gva.B_E_F_share + trade.mark + gdp_share + lag(log(employment.TOTAL)),
-#               index = c("id","time"), model="within", effect="twoways", data = .) 
-# plm.test %>% summary() %>% print() %>% bptest() 
-# plm.test.robust <- plm.test %>% coeftest(((length(unique(data3$id)))/(length(unique(data3$id)) - 1)) * vcovHC(., type="HC1", cluster="group")) %>% print()
-# stargazer(plm.test)
 
 # Revisit matching
 # Define treatment variable
@@ -711,47 +701,83 @@ data3 <- data3 %>% mutate(rail = ifelse(geo == "DEA12" & time >= 2011, 1,
                                                            ifelse(geo == "DE600" & time >= 2013, 1,
                                                                   ifelse(geo == "PL711" & time >= 2013, 1,
                                                                          ifelse(geo == "ES300" & time >= 2014, 1, 0))))))))
-md.pattern(data3)
+
+# md.pattern(test.complete)
+# test <- data3 %>% select(c("rail",
+#                            "metro",
+#                            "urban",
+#                            "employment.TOTAL",
+#                            "coast",
+#                            "port",
+#                            "time",
+#                            "gva.B_E_F_share",
+#                            "gdp_share",
+#                            "gva.TOTAL_capita",
+#                            "population.density",
+#                            "id",
+#                            "geo")) %>% mice()
+# test.complete <- complete(test,1)
 # Prepare data for matching
 # Continue here; work out matching
 data4 <- data3 %>% select(c("rail",
                             "metro",
+                            "population",
                             "urban",
-                            "road_freight",
+                            "employment.TOTAL",
                             "coast",
                             "port",
                             "time",
+                            "gva.B_E_F_share",
+                            "gdp_share",
                             "gva.TOTAL_capita",
                             "population.density",
+                            "pop.growth",
                             "id",
                             "geo")) %>%
-  filter(time >= 2011 & time <= 2017) %>%
-  group_by(id) %>%
+  filter(time >= 2011 & time <= 2017) 
+
+data4 <- data4 %>% group_by(id) %>% 
   filter(!is.na(rail)) %>%
   filter(!is.na(metro)) %>%
   filter(!is.na(urban)) %>%
   filter(!is.na(coast)) %>%
-  filter(!is.na(road_freight)) %>%
+  filter(!is.na(employment.TOTAL)) %>%
   filter(!is.na(port)) %>%
   filter(!is.na(time)) %>%
   filter(!is.na(gva.TOTAL_capita)) %>%
+  filter(!is.na(gva.B_E_F_share)) %>%
+  filter(!is.na(gdp_share)) %>%
   filter(!is.na(population.density))  %>%
+  filter(!is.na(population))  %>%
+  filter(!is.na(pop.growth))  %>%
   make.pbalanced(balance.type = "shared.individuals") %>%
   as.data.frame() %>% arrange(id, time)
 
-md.pattern(data4)
+# # Fit regression to justify predictor variable selection
+lm.test <- data4 %>% lm(log(employment.TOTAL) ~ population.density + population + coast + urban + port + metro + gva.TOTAL_capita + gva.B_E_F_share + gdp_share + 
+                          pop.growth, .)
+lm.test %>% summary() %>% print() %>% bptest()
+lm.test.robust <- lm.test %>% coeftest(vcov = vcovHC(.)) %>% print()
+# test.complete %>% lmrob(employment.TOTAL ~ population + population.density + coast + urban + port + metro + gva.TOTAL_capita + gva.B_E_F_share + trade.mark, .) %>% summary()
+
+plm.test <- data4 %>% distinct(id, time, .keep_all= TRUE) %>% 
+  plm(log(employment.TOTAL) ~ population.density + population + coast + urban + port + metro + gva.TOTAL_capita + pop.growth,
+      index = c("id","time"), model="within", effect="twoways", data = .)
+plm.test %>% summary() %>% print() %>% bptest()
+plm.test.robust <- plm.test %>% coeftest(((length(unique(test.complete$id)))/(length(unique(test.complete$id)) - 1)) * vcovHC(., type="HC1", cluster="group")) %>% 
+  print()
+stargazer(plm.test)
 
 
-data3 %>% filter(geo == "PL711") %>% select(road_freight, time)
-data4 %>% filter(rail == 1)
-summary(data3$port)
+summary(data4$time)
 # Carry out matching using the match MatchIt package
-m.out <- matchit(rail ~ metro + urban + coast + time + population.density + gva.TOTAL_capita, 
-                 data = data4, method = "nearest", distance = "mahalanobis", exact = c("time"))  
+m.out <- matchit(rail ~ metro + port + urban + coast + time + population.density + gva.TOTAL_capita + gva.B_E_F_share + gdp_share, 
+                 data = data4, method = "nearest", distance = "linear.logit", exact = c("time"), ratio = 4)  
 print(m.out)
 m.data <- match.data(m.out, group = "all") 
 print(m.data)
-z.out <- zelig(log(road_freight) ~ rail + metro + urban + coast + time + population.density + gva.TOTAL_capita, data = m.data, model = "ls")
+z.out <- zelig(log(employment.TOTAL) ~ 
+                 rail + metro + urban + port + coast + time + population.density + gva.TOTAL_capita + gva.B_E_F_share + gdp_share, data = m.data, model = "ls")
 print(z.out)
 x.out <- setx(z.out, rail = 0)
 print(x.out)
