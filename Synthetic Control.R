@@ -27,6 +27,7 @@ library(Zelig)
 library(cem)
 library(mice)
 library(optmatch)
+library(influence.ME)
 
 # Load data from Eurostat (NUTS 3)
 data <- get_eurostat(id = "demo_r_d3dens", time_format = "num") %>%
@@ -155,9 +156,11 @@ data <- get_eurostat(id = "demo_r_d3dens", time_format = "num") %>%
   left_join(get_eurostat(id = "ipr_ta_reg", time_format = "num", filters = list(unit = "NR")), 
             by = c("geo","time")) %>% rename(trade.mark  = values) %>%
   left_join(get_eurostat(id = "demo_r_pjanind3", time_format = "num", filters = list(indic_de = "DEPRATIO1", unit = "PC")), 
-            by = c("geo","time")) %>% rename(dependency.ratio  = values) %>% select(-indic_de) %>% 
-  left_join(get_eurostat(id = "demo_r_pjanaggr3", time_format = "num", filters = list(age = "TOTAL", sex = "T", unit = "NR")), 
-            by = c("geo","time")) %>% rename(demo_r_pjanaggr3.TOTAL  = values) %>% select(-c("indic_de","") 
+            by = c("geo","time")) %>% rename(dependency.ratio  = values) %>% select(-indic_de) %>%
+  left_join(get_eurostat(id = "demo_r_pjanaggr3", time_format = "num", filters = list(age = "TOTAL", sex = "T", unit = "NR")),
+            by = c("geo","time")) %>% rename(demo_r_pjanaggr3.TOTAL  = values) %>% select(-c("age","sex")) %>%
+  left_join(get_eurostat(id = "demo_r_pjanaggr3", time_format = "num", filters = list(age = "Y15-64", sex = "T", unit = "NR")),
+            by = c("geo","time")) %>% rename(demo_r_pjanaggr3.Y15_64  = values) %>% select(-c("age","sex"))                                                                                         
   
 # Drop unit identifiers
 
@@ -369,9 +372,8 @@ data2 <- data %>% left_join(added4) %>%
   "LT023","LT024","LT025","LT026","LT027","LT028","LT029","ME000","NL124","NL125","NL126","NL33B","PL713","PL714","PL715","PL722","PL811","PL812",
   "PL815","PL821","PL822","PL824","PL842","PL843","PL922","PL923","PL924","PL925","PL926","UKM72","UKM76","UKM77","UKM91","UKM92","UKM93","UKM94",
   "UKN07","UKN08","UKN10","UKN11","UKN12","UKN15","UKN16"),0,Metro.region.corresponding.to.the.NUTS))) %>%
-  mutate(Port.in.NUTS.3 = ifelse(is.na(Port.in.NUTS.3) & geo %in% c("EL307"),1,Port.in.NUTS.3)) 
+  mutate(Port.in.NUTS.3 = ifelse(is.na(Port.in.NUTS.3) & geo %in% c("EL307"),1,Port.in.NUTS.3)) %>% distinct(geo, time, .keep_all= TRUE)
   
-
 # Enhance port dummy
 # port2009 <- read.csv("Ports_2009.csv") %>% rename(geo = GEO) %>% as_tibble %>% mutate(geo = as.character(geo))
 
@@ -591,8 +593,8 @@ added8 <- data2 %>% filter(geo %in% added6$geo) %>%
                                                                                                                                  geo)))))))))))))) 
 
  
-data2 <- data2 %>% full_join(added8, by = c("geo", "time"), suffix = c("","_extra")) %>% select(-c(263)) %>% split.default(str_remove(names(.), "_extra")) %>%
-  map_df(~ coalesce(!!! .x)) %>% select(geo, time, everything()) %>% select(1:132)
+data2 <- data2 %>% full_join(added8, by = c("geo", "time"), suffix = c("","_extra")) %>% split.default(str_remove(names(.), "_extra")) %>%
+  map_df(~ coalesce(!!! .x)) %>% select(geo, time, everything()) %>% select(1:134)
 
 
 # Drop discontinued NUTS-3 codes
@@ -635,7 +637,6 @@ data2 <- data2 %>% group_by(nuts.2,time) %>% mutate(port.NUTS.2 = ifelse(mean(po
   mutate(employment.TOTAL.NUTS.2 = sum(employment.TOTAL, na.rm = T)) %>% mutate(employment_hitec.TOTAL = sum(employment_hitec.TOTAL, na.rm = T)) %>%
   mutate(employment.TOTAL_capita.NUTS.2 = employment.TOTAL.NUTS.2/population.NUTS.2) %>% mutate(gva.TOTAL_capita.NUTS.2 = gva.TOTAL.NUTS.2/population.NUTS.2) %>%
   mutate(gdp.NUTS.2 = sum(gdp.MIO_EUR, na.rm = T)) %>% mutate(gdp_share.NUTS.2 = gdp.NUTS.2/gdp_country)
- 
 
 # Continue on setting up data
 data3 <- data2  %>% mutate(gva.TOTAL_capita = gva.TOTAL*1000/population) %>% 
@@ -651,9 +652,13 @@ data3$id.NUTS.2 <- data3 %>% group_by(nuts.2) %>% group_indices()
 # Creat country dummies
 data3 <- data3 %>% to_dummy(country, suffix = "label") %>% bind_cols(data3) 
 
-data3 <- data3 %>% group_by(id) %>% mutate(pop.growth = ((population/dplyr::lead(population, order_by = id)-1)*100))
-
-data3 %>% filter(geo == "DEA12") %>% select(time, population, pop.growth)
+data3 <- data3 %>% group_by(id) %>% mutate(pop.growth = ((population/dplyr::lead(population, order_by = id)-1)*100)) %>% 
+  mutate(gva.TOTAL.growth = ((gva.TOTAL/dplyr::lead(gva.TOTAL, order_by = id)-1)*100)) %>% 
+  mutate(employment.TOTAL.lag1 = dplyr::lead(employment.TOTAL, order_by = id)) %>% 
+  mutate(employment.TOTAL.lag5 = dplyr::lead(employment.TOTAL, order_by = id, n = 5L)) %>% 
+  mutate(employment.TOTAL.lag10 = dplyr::lead(employment.TOTAL, order_by = id, n = 10L)) %>% 
+  mutate(dependency.ratio_new = (demo_r_pjanaggr3.TOTAL - demo_r_pjanaggr3.Y15_64) / demo_r_pjanaggr3.Y15_64)
+data3 %>% filter(geo == "DEA12") %>% select(time, employment.TOTAL, employment.TOTAL.lag1)
 # # Evaluate different variables' behavior over time
 # ggarrange(
 #   data3 %>% filter(id == "584") %>% distinct(id, time, .keep_all= TRUE) %>% 
@@ -727,64 +732,136 @@ data4 <- data3 %>% select(c("rail",
                             "coast",
                             "port",
                             "time",
-                            "gva.B_E_F_share",
-                            "gdp_share",
+                            # "gva.B_E_F_share",
+                            # "gdp_share",
+                            "dependency.ratio_new",
                             "gva.TOTAL_capita",
-                            "population.density",
-                            "pop.growth",
+                            # "population.density",
+                            # "pop.growth",
                             "id",
-                            "geo")) %>%
-  filter(time >= 2011 & time <= 2017) 
-
-data4 <- data4 %>% group_by(id) %>% 
-  filter(!is.na(rail)) %>%
-  filter(!is.na(metro)) %>%
-  filter(!is.na(urban)) %>%
-  filter(!is.na(coast)) %>%
+                            "gva.TOTAL.growth",
+                            # "employment.TOTAL.lag10",
+                            # "employment.TOTAL.lag5",
+                            "geo"
+                            )) %>%
+  filter(time >= 2011 & time <= 2017) %>% group_by(id) %>% 
+  mutate(gva.TOTAL.growth = ifelse(is.na(gva.TOTAL.growth), mean(gva.TOTAL.growth, na.rm = T), gva.TOTAL.growth)) %>%
+  # mutate(employment.TOTAL = ifelse(is.na(employment.TOTAL), mean(employment.TOTAL, na.rm = T), employment.TOTAL)) %>%
+  mutate(dependency.ratio_new = ifelse(is.na(dependency.ratio_new), mean(dependency.ratio_new, na.rm = T), dependency.ratio_new)) %>%
+  # mutate(employment.TOTAL.lag1 = ifelse(is.na(employment.TOTAL.lag1), mean(employment.TOTAL.lag1, na.rm = T), employment.TOTAL.lag1)) %>%
+  mutate(gva.TOTAL_capita = ifelse(is.na(gva.TOTAL_capita), mean(gva.TOTAL_capita, na.rm = T), gva.TOTAL_capita)) %>%
+  mutate(population = ifelse(is.na(population), mean(population, na.rm = T), population)) %>%
+  # filter(!is.na(gva.TOTAL.growth)) %>%
+  # filter(!is.na(rail)) %>%
+  # filter(!is.na(metro)) %>%
   filter(!is.na(employment.TOTAL)) %>%
-  filter(!is.na(port)) %>%
-  filter(!is.na(time)) %>%
-  filter(!is.na(gva.TOTAL_capita)) %>%
-  filter(!is.na(gva.B_E_F_share)) %>%
-  filter(!is.na(gdp_share)) %>%
-  filter(!is.na(population.density))  %>%
+  # filter(!is.na(urban)) %>%
+  filter(!is.na(coast)) %>%
+  # # filter(!is.na(dependency.ratio_new)) %>%
+  # filter(!is.na(employment.TOTAL.lag1)) %>%
+  # filter(!is.na(employment.TOTAL)) %>%
+    # filter(!is.na(port)) %>%
+  # filter(!is.na(time)) %>%
+  # # filter(!is.na(gva.TOTAL_capita)) %>%
+  # filter(!is.na(id)) %>%
+  # filter(!is.na(geo)) %>%
+  # # filter(!is.na(gva.B_E_F_share)) %>%
+  # # filter(!is.na(gdp_share)) %>%
+  # # filter(!is.na(population.density))  %>%
   filter(!is.na(population))  %>%
-  filter(!is.na(pop.growth))  %>%
+  # # filter(!is.na(pop.growth))  %>%
   make.pbalanced(balance.type = "shared.individuals") %>%
   as.data.frame() %>% arrange(id, time)
 
 # # Fit regression to justify predictor variable selection
-lm.test <- data4 %>% lm(log(employment.TOTAL) ~ population.density + population + coast + urban + port + metro + gva.TOTAL_capita + gva.B_E_F_share + gdp_share + 
-                          pop.growth, .)
+lm.test <- data4 %>% lm(log(employment.TOTAL) ~ 
+                          # population.density + 
+                          population + 
+                          coast + 
+                          urban + 
+                          # employment.TOTAL.lag1 +
+                          port + 
+                          # gva.B_E_F_share +
+                          dependency.ratio_new +
+                          metro + 
+                          gva.TOTAL_capita + 
+                          # pop.growth +
+                          # gdp_share +
+                          gva.TOTAL.growth, 
+                        .)
 lm.test %>% summary() %>% print() %>% bptest()
 lm.test.robust <- lm.test %>% coeftest(vcov = vcovHC(.)) %>% print()
+stargazer(lm.test.robust)
 # test.complete %>% lmrob(employment.TOTAL ~ population + population.density + coast + urban + port + metro + gva.TOTAL_capita + gva.B_E_F_share + trade.mark, .) %>% summary()
 
 plm.test <- data4 %>% distinct(id, time, .keep_all= TRUE) %>% 
-  plm(log(employment.TOTAL) ~ population.density + population + coast + urban + port + metro + gva.TOTAL_capita + pop.growth,
+  plm(log(employment.TOTAL) ~ 
+        # population.density + 
+        population + 
+        coast + 
+        urban + 
+        # employment.TOTAL.lag1 +
+        port + 
+        # gva.B_E_F_share +
+        dependency.ratio_new +
+        metro + 
+        gva.TOTAL_capita + 
+        # pop.growth +
+        # gdp_share +
+        gva.TOTAL.growth,
       index = c("id","time"), model="within", effect="twoways", data = .)
 plm.test %>% summary() %>% print() %>% bptest()
-plm.test.robust <- plm.test %>% coeftest(((length(unique(test.complete$id)))/(length(unique(test.complete$id)) - 1)) * vcovHC(., type="HC1", cluster="group")) %>% 
-  print()
-stargazer(plm.test)
-
+plm.test.robust <- plm.test %>%coeftest(., vcov=vcovHC(.,type="HC0",cluster="group")) %>% print
+stargazer(plm.test.robust)
+mean(fixef(plm.test))
+se.fixef(plm.test)
 
 summary(data4$time)
 # Carry out matching using the match MatchIt package
-m.out <- matchit(rail ~ metro + port + urban + coast + time + population.density + gva.TOTAL_capita + gva.B_E_F_share + gdp_share, 
-                 data = data4, method = "nearest", distance = "linear.logit", exact = c("time"), ratio = 4)  
-print(m.out)
-m.data <- match.data(m.out, group = "all") 
+m.out <- matchit(rail ~
+                   # population.density + 
+                   population + 
+                   coast + 
+                   urban + 
+                   # employment.TOTAL.lag1 +
+                   port + 
+                   # gva.B_E_F_share +
+                   dependency.ratio_new +
+                   metro + 
+                   gva.TOTAL_capita + 
+                   # pop.growth +
+                   # gdp_share +
+                   gva.TOTAL.growth, 
+                 data = data4, method = "optimal", distance = "mahalanobis")  
+# mahalanobis
+summary(m.out)
+plot(m.out)
+m.data <- match.data(m.out, distance ="pscore")
 print(m.data)
 z.out <- zelig(log(employment.TOTAL) ~ 
-                 rail + metro + urban + port + coast + time + population.density + gva.TOTAL_capita + gva.B_E_F_share + gdp_share, data = m.data, model = "ls")
+                 rail,
+                 # population.density + 
+                 # population + 
+                 # coast + 
+                 # urban + 
+                 # employment.TOTAL.lag1 +
+                 # port + 
+                 # # gva.B_E_F_share +
+                 # dependency.ratio_new +
+                 # metro + 
+                 # gva.TOTAL_capita + 
+                 # # pop.growth +
+                 # # gdp_share +
+                 # gva.TOTAL.growth,
+               data = m.out, model = "ls")
 print(z.out)
-x.out <- setx(z.out, rail = 0)
+x.out <- setx(z.out, data = match.data(m.out, "treat"), cond = TRUE)
 print(x.out)
-x1.out <- setx(z.out, rail = 1)
-print(x1.out)
-s.out <- sim(z.out, x = x.out, x1 = x1.out)
+s.out <- sim(z.out, x = x.out)
 summary(s.out)
+stargazer(s.out)
+
+
 
  # Preparing data set for synthetic control
 data4 <- data3 %>% filter(time >= 2000 & time < 2017) %>% filter(country == "EL") %>% 
