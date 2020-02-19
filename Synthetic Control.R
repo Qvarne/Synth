@@ -657,8 +657,10 @@ data3 <- data3 %>% group_by(id) %>% mutate(pop.growth = ((population/dplyr::lead
   mutate(employment.TOTAL.lag1 = dplyr::lead(employment.TOTAL, order_by = id)) %>% 
   mutate(employment.TOTAL.lag5 = dplyr::lead(employment.TOTAL, order_by = id, n = 5L)) %>% 
   mutate(employment.TOTAL.lag10 = dplyr::lead(employment.TOTAL, order_by = id, n = 10L)) %>% 
-  mutate(dependency.ratio_new = (demo_r_pjanaggr3.TOTAL - demo_r_pjanaggr3.Y15_64) / demo_r_pjanaggr3.Y15_64)
-data3 %>% filter(geo == "DEA12") %>% select(time, employment.TOTAL, employment.TOTAL.lag1)
+  mutate(dependency.ratio_new = (demo_r_pjanaggr3.TOTAL - demo_r_pjanaggr3.Y15_64) / demo_r_pjanaggr3.Y15_64) %>%
+  mutate(employment.B.D_E = employment.B_E - employment.C) %>%
+  mutate(employment.J = employment.G_J - employment.G_I)
+  data3 %>% filter(geo == "DEA12") %>% select(time, employment.TOTAL, employment.TOTAL.lag1)
 # # Evaluate different variables' behavior over time
 # ggarrange(
 #   data3 %>% filter(id == "584") %>% distinct(id, time, .keep_all= TRUE) %>% 
@@ -699,113 +701,113 @@ data3 %>% filter(geo == "DEA12") %>% select(time, employment.TOTAL, employment.T
 
 # Revisit matching
 # Define treatment variable
-data3 <- data3 %>% mutate(rail = ifelse(geo == "DEA12" & time >= 2011, 1,
-                                      ifelse(geo == "PL811" & time >= 2011, 1, 
-                                             ifelse(geo == "CZ053" & time >= 2012, 1,
-                                                    ifelse(geo == "PL911" & time >= 2012, 1,
-                                                           ifelse(geo == "DE600" & time >= 2013, 1,
-                                                                  ifelse(geo == "PL711" & time >= 2013, 1,
-                                                                         ifelse(geo == "ES300" & time >= 2014, 1, 0))))))))
-
-# md.pattern(test.complete)
-# test <- data3 %>% select(c("rail",
-#                            "metro",
-#                            "urban",
-#                            "employment.TOTAL",
-#                            "coast",
-#                            "port",
-#                            "time",
-#                            "gva.B_E_F_share",
-#                            "gdp_share",
-#                            "gva.TOTAL_capita",
-#                            "population.density",
-#                            "id",
-#                            "geo")) %>% mice()
-# test.complete <- complete(test,1)
-# Prepare data for matching
-# Continue here; work out matching
-data4 <- data3 %>% select(c("rail",
-                            "metro",
-                            "population",
-                            "urban",
-                            "employment.TOTAL",
-                            "coast",
-                            "port",
-                            "time",
-                            # "gva.B_E_F_share",
-                            # "gdp_share",
-                            "dependency.ratio_new",
-                            "gva.TOTAL_capita",
-                            # "population.density",
-                            # "pop.growth",
-                            "id",
-                            "gva.TOTAL.growth",
-                            # "employment.TOTAL.lag10",
-                            # "employment.TOTAL.lag5",
-                            "geo"
-                            )) %>%
-  filter(time >= 2011 & time <= 2017) %>% group_by(id) %>% 
-  mutate(gva.TOTAL.growth = ifelse(is.na(gva.TOTAL.growth), mean(gva.TOTAL.growth, na.rm = T), gva.TOTAL.growth)) %>%
-  # mutate(employment.TOTAL = ifelse(is.na(employment.TOTAL), mean(employment.TOTAL, na.rm = T), employment.TOTAL)) %>%
-  mutate(dependency.ratio_new = ifelse(is.na(dependency.ratio_new), mean(dependency.ratio_new, na.rm = T), dependency.ratio_new)) %>%
-  # mutate(employment.TOTAL.lag1 = ifelse(is.na(employment.TOTAL.lag1), mean(employment.TOTAL.lag1, na.rm = T), employment.TOTAL.lag1)) %>%
-  mutate(gva.TOTAL_capita = ifelse(is.na(gva.TOTAL_capita), mean(gva.TOTAL_capita, na.rm = T), gva.TOTAL_capita)) %>%
-  mutate(population = ifelse(is.na(population), mean(population, na.rm = T), population)) %>%
-  # filter(!is.na(gva.TOTAL.growth)) %>%
-  # filter(!is.na(rail)) %>%
-  # filter(!is.na(metro)) %>%
-  filter(!is.na(employment.TOTAL)) %>%
-  # filter(!is.na(urban)) %>%
-  filter(!is.na(coast)) %>%
-  # # filter(!is.na(dependency.ratio_new)) %>%
-  # filter(!is.na(employment.TOTAL.lag1)) %>%
-  # filter(!is.na(employment.TOTAL)) %>%
-    # filter(!is.na(port)) %>%
-  # filter(!is.na(time)) %>%
-  # # filter(!is.na(gva.TOTAL_capita)) %>%
-  # filter(!is.na(id)) %>%
-  # filter(!is.na(geo)) %>%
-  # # filter(!is.na(gva.B_E_F_share)) %>%
-  # # filter(!is.na(gdp_share)) %>%
-  # # filter(!is.na(population.density))  %>%
-  filter(!is.na(population))  %>%
-  # # filter(!is.na(pop.growth))  %>%
-  make.pbalanced(balance.type = "shared.individuals") %>%
-  as.data.frame() %>% arrange(id, time)
-
+# data3 <- data3 %>% mutate(rail = ifelse(geo == "DEA12" & time >= 2011, 1,
+#                                       ifelse(geo == "PL811" & time >= 2011, 1, 
+#                                              ifelse(geo == "CZ053" & time >= 2012, 1,
+#                                                     ifelse(geo == "PL911" & time >= 2012, 1,
+#                                                            ifelse(geo == "DE600" & time >= 2013, 1,
+#                                                                   ifelse(geo == "PL711" & time >= 2013, 1,
+#                                                                          ifelse(geo == "ES300" & time >= 2014, 1, 0))))))))
+# 
+# # md.pattern(test.complete)
+# # test <- data3 %>% select(c("rail",
+# #                            "metro",
+# #                            "urban",
+# #                            "employment.TOTAL",
+# #                            "coast",
+# #                            "port",
+# #                            "time",
+# #                            "gva.B_E_F_share",
+# #                            "gdp_share",
+# #                            "gva.TOTAL_capita",
+# #                            "population.density",
+# #                            "id",
+# #                            "geo")) %>% mice()
+# # test.complete <- complete(test,1)
+# # Prepare data for matching
+# # Continue here; work out matching
+# data4 <- data3 %>% select(c("rail",
+#                             "metro",
+#                             "population",
+#                             "urban",
+#                             "employment.TOTAL",
+#                             "coast",
+#                             "port",
+#                             "time",
+#                             # "gva.B_E_F_share",
+#                             # "gdp_share",
+#                             "dependency.ratio_new",
+#                             "gva.TOTAL_capita",
+#                             # "population.density",
+#                             # "pop.growth",
+#                             "id",
+#                             "gva.TOTAL.growth",
+#                             # "employment.TOTAL.lag10",
+#                             # "employment.TOTAL.lag5",
+#                             "geo"
+#                             )) %>%
+#   filter(time >= 2011 & time <= 2017) %>% group_by(id) %>% 
+#   mutate(gva.TOTAL.growth = ifelse(is.na(gva.TOTAL.growth), mean(gva.TOTAL.growth, na.rm = T), gva.TOTAL.growth)) %>%
+#   # mutate(employment.TOTAL = ifelse(is.na(employment.TOTAL), mean(employment.TOTAL, na.rm = T), employment.TOTAL)) %>%
+#   mutate(dependency.ratio_new = ifelse(is.na(dependency.ratio_new), mean(dependency.ratio_new, na.rm = T), dependency.ratio_new)) %>%
+#   # mutate(employment.TOTAL.lag1 = ifelse(is.na(employment.TOTAL.lag1), mean(employment.TOTAL.lag1, na.rm = T), employment.TOTAL.lag1)) %>%
+#   mutate(gva.TOTAL_capita = ifelse(is.na(gva.TOTAL_capita), mean(gva.TOTAL_capita, na.rm = T), gva.TOTAL_capita)) %>%
+#   mutate(population = ifelse(is.na(population), mean(population, na.rm = T), population)) %>%
+#   # filter(!is.na(gva.TOTAL.growth)) %>%
+#   # filter(!is.na(rail)) %>%
+#   # filter(!is.na(metro)) %>%
+#   filter(!is.na(employment.TOTAL)) %>%
+#   # filter(!is.na(urban)) %>%
+#   filter(!is.na(coast)) %>%
+#   # # filter(!is.na(dependency.ratio_new)) %>%
+#   # filter(!is.na(employment.TOTAL.lag1)) %>%
+#   # filter(!is.na(employment.TOTAL)) %>%
+#     # filter(!is.na(port)) %>%
+#   # filter(!is.na(time)) %>%
+#   # # filter(!is.na(gva.TOTAL_capita)) %>%
+#   # filter(!is.na(id)) %>%
+#   # filter(!is.na(geo)) %>%
+#   # # filter(!is.na(gva.B_E_F_share)) %>%
+#   # # filter(!is.na(gdp_share)) %>%
+#   # # filter(!is.na(population.density))  %>%
+#   filter(!is.na(population))  %>%
+#   # # filter(!is.na(pop.growth))  %>%
+#   make.pbalanced(balance.type = "shared.individuals") %>%
+#   as.data.frame() %>% arrange(id, time)
+# 
 # # Fit regression to justify predictor variable selection
-lm.test <- data4 %>% lm(log(employment.TOTAL) ~ 
-                          # population.density + 
-                          population + 
-                          coast + 
-                          urban + 
+lm.test <- data %>% filter(time >= 2000 & time < 2017) %>% lm(log(employment.TOTAL) ~
+                          # population.density +
+                          population +
+                          coast +
+                          urban +
                           # employment.TOTAL.lag1 +
-                          port + 
+                          port +
                           # gva.B_E_F_share +
                           dependency.ratio_new +
-                          metro + 
-                          gva.TOTAL_capita + 
+                          metro +
+                          gva.TOTAL_capita +
                           # pop.growth +
                           # gdp_share +
-                          gva.TOTAL.growth, 
+                          gva.TOTAL.growth,
                         .)
 lm.test %>% summary() %>% print() %>% bptest()
 lm.test.robust <- lm.test %>% coeftest(vcov = vcovHC(.)) %>% print()
 stargazer(lm.test.robust)
 # test.complete %>% lmrob(employment.TOTAL ~ population + population.density + coast + urban + port + metro + gva.TOTAL_capita + gva.B_E_F_share + trade.mark, .) %>% summary()
 
-plm.test <- data4 %>% distinct(id, time, .keep_all= TRUE) %>% 
-  plm(log(employment.TOTAL) ~ 
-        # population.density + 
-        population + 
-        coast + 
-        urban + 
+plm.test <- data4 %>% distinct(id, time, .keep_all= TRUE) %>%
+  plm(log(employment.TOTAL) ~
+        # population.density +
+        population +
+        coast +
+        urban +
         # employment.TOTAL.lag1 +
-        port + 
+        port +
         # gva.B_E_F_share +
         dependency.ratio_new +
-        metro + 
-        gva.TOTAL_capita + 
+        metro +
+        gva.TOTAL_capita +
         # pop.growth +
         # gdp_share +
         gva.TOTAL.growth,
@@ -815,153 +817,220 @@ plm.test.robust <- plm.test %>%coeftest(., vcov=vcovHC(.,type="HC0",cluster="gro
 stargazer(plm.test.robust)
 mean(fixef(plm.test))
 se.fixef(plm.test)
-
-summary(data4$time)
-# Carry out matching using the match MatchIt package
-m.out <- matchit(rail ~
-                   # population.density + 
-                   population + 
-                   coast + 
-                   urban + 
-                   # employment.TOTAL.lag1 +
-                   port + 
-                   # gva.B_E_F_share +
-                   dependency.ratio_new +
-                   metro + 
-                   gva.TOTAL_capita + 
-                   # pop.growth +
-                   # gdp_share +
-                   gva.TOTAL.growth, 
-                 data = data4, method = "optimal", distance = "mahalanobis")  
-# mahalanobis
-summary(m.out)
-plot(m.out)
-m.data <- match.data(m.out, distance ="pscore")
-print(m.data)
-z.out <- zelig(log(employment.TOTAL) ~ 
-                 rail,
-                 # population.density + 
-                 # population + 
-                 # coast + 
-                 # urban + 
-                 # employment.TOTAL.lag1 +
-                 # port + 
-                 # # gva.B_E_F_share +
-                 # dependency.ratio_new +
-                 # metro + 
-                 # gva.TOTAL_capita + 
-                 # # pop.growth +
-                 # # gdp_share +
-                 # gva.TOTAL.growth,
-               data = m.out, model = "ls")
-print(z.out)
-x.out <- setx(z.out, data = match.data(m.out, "treat"), cond = TRUE)
-print(x.out)
-s.out <- sim(z.out, x = x.out)
-summary(s.out)
-stargazer(s.out)
-
-
+# 
+# summary(data4$time)
+# # Carry out matching using the match MatchIt package
+# m.out <- matchit(rail ~
+#                    # population.density + 
+#                    population + 
+#                    coast + 
+#                    urban + 
+#                    # employment.TOTAL.lag1 +
+#                    port + 
+#                    # gva.B_E_F_share +
+#                    dependency.ratio_new +
+#                    metro + 
+#                    gva.TOTAL_capita + 
+#                    # pop.growth +
+#                    # gdp_share +
+#                    gva.TOTAL.growth, 
+#                  data = data4, method = "optimal", distance = "mahalanobis")  
+# # mahalanobis
+# summary(m.out)
+# plot(m.out)
+# m.data <- match.data(m.out, distance ="pscore")
+# print(m.data)
+# z.out <- zelig(log(employment.TOTAL) ~ 
+#                  rail,
+#                  # population.density + 
+#                  # population + 
+#                  # coast + 
+#                  # urban + 
+#                  # employment.TOTAL.lag1 +
+#                  # port + 
+#                  # # gva.B_E_F_share +
+#                  # dependency.ratio_new +
+#                  # metro + 
+#                  # gva.TOTAL_capita + 
+#                  # # pop.growth +
+#                  # # gdp_share +
+#                  # gva.TOTAL.growth,
+#                data = m.out, model = "ls")
+# print(z.out)
+# x.out <- setx(z.out, data = match.data(m.out, "treat"), cond = TRUE)
+# print(x.out)
+# s.out <- sim(z.out, x = x.out)
+# summary(s.out)
+# stargazer(s.out)
+# 
+# 
 
  # Preparing data set for synthetic control
-data4 <- data3 %>% filter(time >= 2000 & time < 2017) %>% filter(country == "EL") %>% 
+data4 <- data3 %>% filter(time >= 2000 & time < 2017) %>% filter(country == "DE") %>% 
   distinct(id, time, .keep_all= TRUE) %>%
-  mutate(treatment = ifelse(time >= 2009, 1, 0)) %>%
+  mutate(treatment = ifelse(time >= 2011, 1, 0)) %>%
   group_by(id, treatment) %>%
-  mutate(mean_gva.B_E_F_share = ifelse(time < 2009 & is.na(gva.B_E_F_share), mean(gva.B_E_F_share, na.rm = TRUE), gva.B_E_F_share)) %>%
-  mutate(mean_trade.mark = ifelse(time < 2009 & is.na(trade.mark), mean(trade.mark, na.rm = TRUE), trade.mark)) %>%
-  mutate(mean_gva.TOTAL_capita = ifelse(time < 2009 & is.na(gva.TOTAL_capita), mean(gva.TOTAL_capita, na.rm = TRUE), gva.TOTAL_capita)) %>%
-  mutate(mean_population = ifelse(time < 2009 & is.na(population), mean(population, na.rm = TRUE), population)) %>%
-  mutate(mean_gdp_share = ifelse(time < 2009 & is.na(gdp_share), mean(gdp_share, na.rm = TRUE), gdp_share)) %>%
-  mutate(mean_population.density = ifelse(time < 2009 & is.na(population.density), mean(population.density, na.rm = TRUE), population.density)) %>% group_by(id) %>%
+  # mutate(gva.B_E_F_share = ifelse(time < 2011 & is.na(gva.B_E_F_share), mean(gva.B_E_F_share, na.rm = TRUE), gva.B_E_F_share)) %>%
+  # mutate(trade.mark = ifelse(time < 2011 & is.na(trade.mark), mean(trade.mark, na.rm = TRUE), trade.mark)) %>%
+  mutate(gva.TOTAL_capita = ifelse(time < 2011 & is.na(gva.TOTAL_capita), mean(gva.TOTAL_capita, na.rm = TRUE), gva.TOTAL_capita)) %>%
+  mutate(population = ifelse(time < 2011 & is.na(population), mean(population, na.rm = TRUE), population)) %>%
+  mutate(gva.TOTAL.growth = ifelse(time < 2011 & is.na(gva.TOTAL.growth), mean(gva.TOTAL.growth, na.rm = TRUE), gva.TOTAL.growth)) %>%
+  mutate(dependency.ratio_new = ifelse(time < 2011 & is.na(dependency.ratio_new), mean(dependency.ratio_new, na.rm = TRUE), dependency.ratio_new)) %>%
+  # mutate(coast = ifelse(is.na(coast) & mean(coast, na.rm = T) > 0, 1, coast)) %>%
+  # mutate(gdp_share = ifelse(time < 2011 & is.na(gdp_share), mean(gdp_share, na.rm = TRUE), gdp_share)) %>%
+  # mutate(population.density = ifelse(time < 2011 & is.na(population.density), mean(population.density, na.rm = TRUE), population.density)) %>% group_by(id) %>%
   filter(!is.na(id)) %>%
-  filter(!is.na(employment.TOTAL)) %>%
+  filter(!is.na(employment.C)) %>%
   filter(!is.na(geo)) %>%
   filter(!is.na(time)) %>%
-  filter(!is.na(mean_gva.B_E_F_share)) %>%
-  filter(!is.na(mean_population)) %>%
-  filter(!is.na(mean_trade.mark)) %>%
-  filter(!is.na(mean_gva.TOTAL_capita)) %>%
-  filter(!is.na(mean_gdp_share)) %>%
-  filter(!is.na(mean_population.density)) %>%
+  # filter(!is.na(gva.B_E_F_share)) %>%
+  filter(!is.na(population)) %>%
+  # filter(!is.na(trade.mark)) %>%
+  filter(!is.na(gva.TOTAL_capita)) %>%
+  filter(!is.na(dependency.ratio_new)) %>%
+  filter(!is.na(gva.TOTAL.growth)) %>%
+  filter(!is.na(coast)) %>%
+  filter(!is.na(port)) %>%
+  filter(!is.na(metro)) %>%
+  filter(!is.na(urban)) %>%
+  # filter(!is.na(gdp_share)) %>%
+  # filter(!is.na(population.density)) %>%
   as.data.frame() %>% 
   select(c(
-           "employment.TOTAL", 
+           "employment.C", 
            "id",
            "time",
            "geo",
-           "mean_gva.B_E_F_share",
-           "mean_population",
-           "mean_trade.mark",
-           "mean_gva.TOTAL_capita",
-           "mean_population.density",
-           "mean_gdp_share"
+           "population",
+           "coast",
+           "port",
+           "dependency.ratio_new",
+           "metro",
+           "gva.TOTAL_capita",
+           "gva.TOTAL.growth",
+           # "trade.mark",
+           "urban"
+           # "population.density",
+           # "gdp_share"
            )) %>%
   distinct(id, time, .keep_all= TRUE) %>% select(id, time, everything())
-
-
+data5 %>% filter(geo == "EL307")
 data5 <- make.pbalanced(data4, balance.type = "shared.individuals")
+summary(data4$employment.C)
+# 
+# lm.test <- data5 %>% lm(log(employment.C) ~
+#                                                                 # population.density +
+#                                                                 population +
+#                                                                 coast +
+#                                                                 urban +
+#                                                                 # employment.C.lag1 +
+#                                                                 port +
+#                                                                 # gva.B_E_F_share +
+#                                                                 dependency.ratio_new +
+#                                                                 metro +
+#                                                                 gva.TOTAL_capita +
+#                                                                 # pop.growth +
+#                                                                 # gdp_share +
+#                                                                 gva.TOTAL.growth,
+#                                                               .)
+# lm.test %>% summary() %>% print() %>% bptest()
+# lm.test.robust <- lm.test %>% coeftest(vcov = vcovHC(.)) %>% print()
+# stargazer(lm.test.robust)
+# 
+# 
+# 
+# plm.test <- data4 %>% distinct(id, time, .keep_all= TRUE) %>%
+#   plm(log(employment.C) ~
+#         # population.density +
+#         population +
+#         coast +
+#         urban +
+#         # employment.C.lag1 +
+#         port +
+#         # gva.B_E_F_share +
+#         dependency.ratio_new +
+#         metro +
+#         gva.TOTAL_capita +
+#         # pop.growth +
+#         # gdp_share +
+#         gva.TOTAL.growth,
+#       index = c("id","time"), model="within", effect="twoways", data = .)
+# plm.test %>% summary() %>% print() %>% bptest()
+# plm.test.robust <- plm.test %>%coeftest(., vcov=vcovHC(.,type="HC0",cluster="group")) %>% print
+# stargazer(plm.test.robust)
+# mean(fixef(plm.test))
+# se.fixef(plm.test)
 
-data5 %>% filter(geo == "EL411")
+
+
+data5 %>% filter(id == "403")
 
 b <- unique(data5$id) 
 
-c <- b[!b %in%  c(578:584)]
+c <- b[!b %in%  c(402:416)]
 
 # Run synthetic control estimation and plot results
 dataprep.out<-
   dataprep(
     foo = data5,
     predictors = c(
-      "mean_gva.B_E_F_share",
-      "mean_population",
-      "mean_trade.mark",
-      "mean_gva.TOTAL_capita",
-      "mean_population.density",
-      "mean_gdp_share"
+      # population.density +
+      "population",
+        "coast", 
+        "urban",
+        # employment.C.lag1 +
+        "port",
+        # gva.B_E_F_share +
+        "dependency.ratio_new",
+        "metro",
+        "gva.TOTAL_capita",
+        # pop.growth +
+        # gdp_share +
+        "gva.TOTAL.growth"
                    ),
     predictors.op = "mean",
-    dependent = "employment.TOTAL",
+    dependent = "employment.C",
     unit.variable = c("id"),
     time.variable = c("time"),
     special.predictors = list(
-      list("employment.TOTAL", 2000, "mean"),
-      # list("employment.TOTAL", 2001, "mean"),
-      # list("employment.TOTAL", 2002, "mean"),
-      # list("employment.TOTAL", 2003, "mean"),
-      list("employment.TOTAL", 2004, "mean"),
-      # list("employment.TOTAL", 2005, "mean"),
-      # list("employment.TOTAL", 2006, "mean"),
-      # list("employment.TOTAL", 2007, "mean"),
-      list("employment.TOTAL", 2008, "mean")
-      # list("employment.TOTAL", 2009, "mean"),
-      # list("employment.TOTAL", 2010, "mean")
+      list("employment.C", 2000, "mean"),
+      # list("employment.C", 2001, "mean"),
+      # list("employment.C", 2002, "mean"),
+      # list("employment.C", 2003, "mean"),
+      # list("employment.C", 2004, "mean"),
+      # list("employment.C", 2005, "mean"),
+      list("employment.C", 2006, "mean"),
+      # list("employment.C", 2007, "mean"),
+      # list("employment.C", 2008, "mean")
+      # list("employment.C", 2009, "mean"),
+      list("employment.C", 2010, "mean")
     ),
-    treatment.identifier = 584,
+    treatment.identifier = 403,
     controls.identifier = c,
-    time.predictors.prior = c(2000:2008),
-    time.optimize.ssr = c(2000:2008),
+    time.predictors.prior = c(2000:2010),
+    time.optimize.ssr = c(2000:2010),
     unit.names.variable = "geo",
     time.plot = 2000:2016
   )
 
 
-employment.TOTAL.out <- synth(dataprep.out) # verbose = TRUE, optimxmethod = "All")
+employment.C.out <- synth(dataprep.out) # verbose = TRUE, optimxmethod = "All")
 dataprep.out$Y1plot
-dataprep.out$Y0plot %*% employment.TOTAL.out$solution.w
-synth.tables <- synth.tab(dataprep.res = dataprep.out,synth.res = employment.TOTAL.out)
+dataprep.out$Y0plot %*% employment.C.out$solution.w
+synth.tables <- synth.tab(dataprep.res = dataprep.out,synth.res = employment.C.out)
 print(synth.tables$tab.pred)
 print(synth.tables$tab.v)
 test <- synth.tables$tab.w %>% filter(w.weights > 0)
 print(synth.tables$tab.w %>% filter(w.weights > 0))
 
-path.plot(synth.res = employment.TOTAL.out,
+path.plot(synth.res = employment.C.out,
           dataprep.res = dataprep.out,
-          tr.intake = 2009,
+          tr.intake = 2011,
           Ylab = c("Employment (thousand persons)"),
           Xlab = c("year"),
-          Legend = c("Piraeus","Synthetic Piraeus"),
+          Legend = c("Duisburg","Synthetic Duisburg"),
 )
+
 
 
 data3 %>% filter(id %in% test$unit.numbers | geo == "DEA1") %>% ggplot(aes(x=time,colour=factor(id))) + geom_line(aes(y=employment.TOTAL)) +
