@@ -864,7 +864,7 @@ se.fixef(plm.test)
 # stargazer(s.out)
 # 
 # 
-
+data3$employment.TOTAL_capita
  # Preparing data set for synthetic control
 data4 <- data3 %>% filter(time >= 2000 & time < 2017) %>% filter(country == "EL") %>% 
   distinct(id, time, .keep_all= TRUE) %>%
@@ -892,6 +892,7 @@ data4 <- data3 %>% filter(time >= 2000 & time < 2017) %>% filter(country == "EL"
   filter(!is.na(employment.M_N)) %>%
   filter(!is.na(employment.O_Q)) %>%
   filter(!is.na(employment.R_U)) %>%
+  filter(!is.na(employment.TOTAL_capita)) %>%
   filter(!is.na(geo)) %>%
   filter(!is.na(time)) %>%
   # filter(!is.na(gva.B_E_F_share)) %>%
@@ -920,6 +921,7 @@ data4 <- data3 %>% filter(time >= 2000 & time < 2017) %>% filter(country == "EL"
            "employment.M_N",
            "employment.O_Q",
            "employment.R_U",
+           "employment.TOTAL_capita",
            "id",
            "time",
            "geo",
@@ -940,53 +942,53 @@ data5 %>% filter(geo == "EL307")
 data5 <- make.pbalanced(data4, balance.type = "shared.individuals")
 summary(data4$employment.A)
 # 
-# lm.test <- data5 %>% lm(log(employment.A) ~
-#                                                                 # population.density +
-#                                                                 population +
-#                                                                 coast +
-#                                                                 urban +
-#                                                                 # employment.A.lag1 +
-#                                                                 port +
-#                                                                 # gva.B_E_F_share +
-#                                                                 dependency.ratio_new +
-#                                                                 metro +
-#                                                                 gva.TOTAL_capita +
-#                                                                 # pop.growth +
-#                                                                 # gdp_share +
-#                                                                 gva.TOTAL.growth,
-#                                                               .)
-# lm.test %>% summary() %>% print() %>% bptest()
-# lm.test.robust <- lm.test %>% coeftest(vcov = vcovHC(.)) %>% print()
-# stargazer(lm.test.robust)
-# 
-# 
-# 
-# plm.test <- data4 %>% distinct(id, time, .keep_all= TRUE) %>%
-#   plm(log(employment.A) ~
-#         # population.density +
-#         population +
-#         coast +
-#         urban +
-#         # employment.A.lag1 +
-#         port +
-#         # gva.B_E_F_share +
-#         dependency.ratio_new +
-#         metro +
-#         gva.TOTAL_capita +
-#         # pop.growth +
-#         # gdp_share +
-#         gva.TOTAL.growth,
-#       index = c("id","time"), model="within", effect="twoways", data = .)
-# plm.test %>% summary() %>% print() %>% bptest()
-# plm.test.robust <- plm.test %>%coeftest(., vcov=vcovHC(.,type="HC0",cluster="group")) %>% print
-# stargazer(plm.test.robust)
-# mean(fixef(plm.test))
-# se.fixef(plm.test)
+lm.test <- data5 %>% lm(log(employment.TOTAL_capita) ~
+                                                                # population.density +
+                                                                population +
+                                                                # coast +
+                                                                urban +
+                                                                # employment.A.lag1 +
+                                                                # port +
+                                                                # gva.B_E_F_share +
+                                                                dependency.ratio_new +
+                                                                metro +
+                                                                gva.TOTAL_capita +
+                                                                # pop.growth +
+                                                                # gdp_share +
+                                                                gva.TOTAL.growth,
+                                                              .)
+lm.test %>% summary() %>% print() %>% bptest()
+lm.test.robust <- lm.test %>% coeftest(vcov = vcovHC(.)) %>% print()
+stargazer(lm.test.robust)
+
+
+
+plm.test <- data4 %>% distinct(id, time, .keep_all= TRUE) %>%
+  plm(log(employment.TOTAL_capita) ~
+        # population.density +
+        population +
+        coast +
+        urban +
+        # employment.A.lag1 +
+        port +
+        # gva.B_E_F_share +
+        dependency.ratio_new +
+        metro +
+        gva.TOTAL_capita +
+        # pop.growth +
+        # gdp_share +
+        gva.TOTAL.growth,
+      index = c("id","time"), model="within", effect="twoways", data = .)
+plm.test %>% summary() %>% print() %>% bptest()
+plm.test.robust <- plm.test %>%coeftest(., vcov=vcovHC(.,type="HC0",cluster="group")) %>% print
+stargazer(plm.test.robust)
+mean(fixef(plm.test))
+se.fixef(plm.test)
 
 
 
 # data5 %>% filter(id == "403")
-data5 %>% filter(id == "584")
+data5 %>% filter(id == "581")
 
 b <- unique(data5$id) 
 
@@ -1001,7 +1003,7 @@ dataprep.out<-
       # population.density +
       "population",
         "coast", 
-        "urban",
+        # "urban",
         # employment.A.lag1 +
         "port",
         # gva.B_E_F_share +
@@ -1013,21 +1015,21 @@ dataprep.out<-
         "gva.TOTAL.growth"
                    ),
     predictors.op = "mean",
-    dependent = "employment.TOTAL",
+    dependent = "employment.TOTAL_capita",
     unit.variable = c("id"),
     time.variable = c("time"),
     special.predictors = list(
-      list("employment.TOTAL", 2000, "mean"),
-      # list("employment.TOTAL", 2001, "mean"),
-      # list("employment.TOTAL", 2002, "mean"),
-      # list("employment.TOTAL", 2003, "mean"),
-      list("employment.TOTAL", 2004, "mean"),
-      # list("employment.TOTAL", 2005, "mean"),
-      # list("employment.TOTAL", 2006, "mean"),
-      # list("employment.TOTAL", 2007, "mean"),
-      list("employment.TOTAL", 2008, "mean")
-      # list("employment.TOTAL", 2009, "mean"),
-      # list("employment.TOTAL", 2010, "mean")
+      list("employment.TOTAL_capita", 2000, "mean"),
+      # list("employment.TOTAL_capita", 2001, "mean"),
+      # list("employment.TOTAL_capita", 2002, "mean"),
+      # list("employment.TOTAL_capita", 2003, "mean"),
+      list("employment.TOTAL_capita", 2004, "mean"),
+      # list("employment.TOTAL_capita", 2005, "mean"),
+      # list("employment.TOTAL_capita", 2006, "mean"),
+      # list("employment.TOTAL_capita", 2007, "mean"),
+      list("employment.TOTAL_capita", 2008, "mean")
+      # list("employment.TOTAL_capita", 2009, "mean"),
+      # list("employment.TOTAL_capita", 2010, "mean")
     ),
     treatment.identifier = 584,
     controls.identifier = c,
@@ -1038,29 +1040,29 @@ dataprep.out<-
   )
 
 
-employment.TOTAL.out <- synth(dataprep.out) # verbose = TRUE, optimxmethod = "All")
+employment.TOTAL_capita.out <- synth(dataprep.out) # verbose = TRUE, optimxmethod = "All")
 dataprep.out$Y1plot
-dataprep.out$Y0plot %*% employment.TOTAL.out$solution.w
-synth.tables <- synth.tab(dataprep.res = dataprep.out,synth.res = employment.TOTAL.out)
+dataprep.out$Y0plot %*% employment.TOTAL_capita.out$solution.w
+synth.tables <- synth.tab(dataprep.res = dataprep.out,synth.res = employment.TOTAL_capita.out)
 print(synth.tables$tab.pred)
 print(synth.tables$tab.v)
 test <- synth.tables$tab.w %>% filter(w.weights > 0)
 print(synth.tables$tab.w %>% filter(w.weights > 0))
 
-path.plot(synth.res = employment.TOTAL.out,
+path.plot(synth.res = employment.TOTAL_capita.out,
           dataprep.res = dataprep.out,
           tr.intake = 2009,
           Ylab = c("Employment (thousand persons)"),
           Xlab = c("year"),
-          Legend = c("Duisburg","Synthetic Duisburg"),
+          Legend = c("Piraeus","Synthetic Piraues"),
 )
-
-
+xtable(synth.tables$tab.v, digits = 3)
+data4$employ
 
 data3 %>% filter(id %in% test$unit.numbers | geo == "DEA1") %>% ggplot(aes(x = time, colour = factor(id))) + geom_line(aes(y = employment.TOTAL)) +
   gghighlight(geo == "DEA1")
 data4 %>% ggplot(aes(x = time,colour=factor(id))) + geom_line(aes(y = employment.TOTAL)) +
-  gghighlight(id %in% c(578:584)) + ylab("Employment (thousand persons)") + theme(legend.position = "none") + xlab("") + xlim(2000, 2016)
+  gghighlight(id %in% c(578:583)) + ylab("Employment (thousand persons)") + theme(legend.position = "none") + xlab("") + xlim(2000, 2016)
 data3 %>% filter(id == "69") %>% ggplot(aes(x=time)) + geom_line(aes(y=hours.worked.A,colour="hours.worked.A")) + 
   geom_line(aes(y=hours.worked.B_E,colour="hours.worked.B_E")) + geom_line(aes(y=hours.worked.C,colour="hours.worked.C")) + 
   geom_line(aes(y=hours.worked.F,colour="hours.worked.F")) + geom_line(aes(y=hours.worked.A,colour="hours.worked.A")) + 
