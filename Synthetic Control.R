@@ -866,21 +866,32 @@ se.fixef(plm.test)
 # 
 
  # Preparing data set for synthetic control
-data4 <- data3 %>% filter(time >= 2000 & time < 2017) %>% filter(country == "DE") %>% 
+data4 <- data3 %>% filter(time >= 2000 & time < 2017) %>% filter(country == "EL") %>% 
   distinct(id, time, .keep_all= TRUE) %>%
-  mutate(treatment = ifelse(time >= 2011, 1, 0)) %>%
+  mutate(treatment = ifelse(time >= 2009, 1, 0)) %>%
   group_by(id, treatment) %>%
-  # mutate(gva.B_E_F_share = ifelse(time < 2011 & is.na(gva.B_E_F_share), mean(gva.B_E_F_share, na.rm = TRUE), gva.B_E_F_share)) %>%
-  # mutate(trade.mark = ifelse(time < 2011 & is.na(trade.mark), mean(trade.mark, na.rm = TRUE), trade.mark)) %>%
-  mutate(gva.TOTAL_capita = ifelse(time < 2011 & is.na(gva.TOTAL_capita), mean(gva.TOTAL_capita, na.rm = TRUE), gva.TOTAL_capita)) %>%
-  mutate(population = ifelse(time < 2011 & is.na(population), mean(population, na.rm = TRUE), population)) %>%
-  mutate(gva.TOTAL.growth = ifelse(time < 2011 & is.na(gva.TOTAL.growth), mean(gva.TOTAL.growth, na.rm = TRUE), gva.TOTAL.growth)) %>%
-  mutate(dependency.ratio_new = ifelse(time < 2011 & is.na(dependency.ratio_new), mean(dependency.ratio_new, na.rm = TRUE), dependency.ratio_new)) %>%
+  # mutate(gva.B_E_F_share = ifelse(time < 2009 & is.na(gva.B_E_F_share), mean(gva.B_E_F_share, na.rm = TRUE), gva.B_E_F_share)) %>%
+  # mutate(trade.mark = ifelse(time < 2009 & is.na(trade.mark), mean(trade.mark, na.rm = TRUE), trade.mark)) %>%
+  mutate(gva.TOTAL_capita = ifelse(time < 2009 & is.na(gva.TOTAL_capita), mean(gva.TOTAL_capita, na.rm = TRUE), gva.TOTAL_capita)) %>%
+  mutate(population = ifelse(time < 2009 & is.na(population), mean(population, na.rm = TRUE), population)) %>%
+  mutate(gva.TOTAL.growth = ifelse(time < 2009 & is.na(gva.TOTAL.growth), mean(gva.TOTAL.growth, na.rm = TRUE), gva.TOTAL.growth)) %>%
+  mutate(dependency.ratio_new = ifelse(time < 2009 & is.na(dependency.ratio_new), mean(dependency.ratio_new, na.rm = TRUE), dependency.ratio_new)) %>%
   # mutate(coast = ifelse(is.na(coast) & mean(coast, na.rm = T) > 0, 1, coast)) %>%
-  # mutate(gdp_share = ifelse(time < 2011 & is.na(gdp_share), mean(gdp_share, na.rm = TRUE), gdp_share)) %>%
-  # mutate(population.density = ifelse(time < 2011 & is.na(population.density), mean(population.density, na.rm = TRUE), population.density)) %>% group_by(id) %>%
+  # mutate(gdp_share = ifelse(time < 2009 & is.na(gdp_share), mean(gdp_share, na.rm = TRUE), gdp_share)) %>%
+  # mutate(population.density = ifelse(time < 2009 & is.na(population.density), mean(population.density, na.rm = TRUE), population.density)) %>% group_by(id) %>%
   filter(!is.na(id)) %>%
+  filter(!is.na(employment.TOTAL)) %>%
+  filter(!is.na(employment.A)) %>%
+  filter(!is.na(employment.B.D_E)) %>%
   filter(!is.na(employment.C)) %>%
+  filter(!is.na(employment.F)) %>%
+  filter(!is.na(employment.G_I)) %>%
+  filter(!is.na(employment.J)) %>%
+  filter(!is.na(employment.K)) %>%
+  filter(!is.na(employment.L)) %>%
+  filter(!is.na(employment.M_N)) %>%
+  filter(!is.na(employment.O_Q)) %>%
+  filter(!is.na(employment.R_U)) %>%
   filter(!is.na(geo)) %>%
   filter(!is.na(time)) %>%
   # filter(!is.na(gva.B_E_F_share)) %>%
@@ -897,7 +908,18 @@ data4 <- data3 %>% filter(time >= 2000 & time < 2017) %>% filter(country == "DE"
   # filter(!is.na(population.density)) %>%
   as.data.frame() %>% 
   select(c(
-           "employment.C", 
+           "employment.TOTAL", 
+           "employment.A",
+           "employment.B.D_E",
+           "employment.C",
+           "employment.F",
+           "employment.G_I",
+           "employment.J",
+           "employment.K",
+           "employment.L",
+           "employment.M_N",
+           "employment.O_Q",
+           "employment.R_U",
            "id",
            "time",
            "geo",
@@ -916,14 +938,14 @@ data4 <- data3 %>% filter(time >= 2000 & time < 2017) %>% filter(country == "DE"
   distinct(id, time, .keep_all= TRUE) %>% select(id, time, everything())
 data5 %>% filter(geo == "EL307")
 data5 <- make.pbalanced(data4, balance.type = "shared.individuals")
-summary(data4$employment.C)
+summary(data4$employment.A)
 # 
-# lm.test <- data5 %>% lm(log(employment.C) ~
+# lm.test <- data5 %>% lm(log(employment.A) ~
 #                                                                 # population.density +
 #                                                                 population +
 #                                                                 coast +
 #                                                                 urban +
-#                                                                 # employment.C.lag1 +
+#                                                                 # employment.A.lag1 +
 #                                                                 port +
 #                                                                 # gva.B_E_F_share +
 #                                                                 dependency.ratio_new +
@@ -940,12 +962,12 @@ summary(data4$employment.C)
 # 
 # 
 # plm.test <- data4 %>% distinct(id, time, .keep_all= TRUE) %>%
-#   plm(log(employment.C) ~
+#   plm(log(employment.A) ~
 #         # population.density +
 #         population +
 #         coast +
 #         urban +
-#         # employment.C.lag1 +
+#         # employment.A.lag1 +
 #         port +
 #         # gva.B_E_F_share +
 #         dependency.ratio_new +
@@ -963,11 +985,13 @@ summary(data4$employment.C)
 
 
 
-data5 %>% filter(id == "403")
+# data5 %>% filter(id == "403")
+data5 %>% filter(id == "584")
 
 b <- unique(data5$id) 
 
-c <- b[!b %in%  c(402:416)]
+# c <- b[!b %in%  c(402:416)]
+c <- b[!b %in%  c(578:584)]
 
 # Run synthetic control estimation and plot results
 dataprep.out<-
@@ -978,7 +1002,7 @@ dataprep.out<-
       "population",
         "coast", 
         "urban",
-        # employment.C.lag1 +
+        # employment.A.lag1 +
         "port",
         # gva.B_E_F_share +
         "dependency.ratio_new",
@@ -989,43 +1013,43 @@ dataprep.out<-
         "gva.TOTAL.growth"
                    ),
     predictors.op = "mean",
-    dependent = "employment.C",
+    dependent = "employment.TOTAL",
     unit.variable = c("id"),
     time.variable = c("time"),
     special.predictors = list(
-      list("employment.C", 2000, "mean"),
-      # list("employment.C", 2001, "mean"),
-      # list("employment.C", 2002, "mean"),
-      # list("employment.C", 2003, "mean"),
-      # list("employment.C", 2004, "mean"),
-      # list("employment.C", 2005, "mean"),
-      list("employment.C", 2006, "mean"),
-      # list("employment.C", 2007, "mean"),
-      # list("employment.C", 2008, "mean")
-      # list("employment.C", 2009, "mean"),
-      list("employment.C", 2010, "mean")
+      list("employment.TOTAL", 2000, "mean"),
+      # list("employment.TOTAL", 2001, "mean"),
+      # list("employment.TOTAL", 2002, "mean"),
+      # list("employment.TOTAL", 2003, "mean"),
+      list("employment.TOTAL", 2004, "mean"),
+      # list("employment.TOTAL", 2005, "mean"),
+      # list("employment.TOTAL", 2006, "mean"),
+      # list("employment.TOTAL", 2007, "mean"),
+      list("employment.TOTAL", 2008, "mean")
+      # list("employment.TOTAL", 2009, "mean"),
+      # list("employment.TOTAL", 2010, "mean")
     ),
-    treatment.identifier = 403,
+    treatment.identifier = 584,
     controls.identifier = c,
-    time.predictors.prior = c(2000:2010),
-    time.optimize.ssr = c(2000:2010),
+    time.predictors.prior = c(2000:2008),
+    time.optimize.ssr = c(2000:2008),
     unit.names.variable = "geo",
     time.plot = 2000:2016
   )
 
 
-employment.C.out <- synth(dataprep.out) # verbose = TRUE, optimxmethod = "All")
+employment.TOTAL.out <- synth(dataprep.out) # verbose = TRUE, optimxmethod = "All")
 dataprep.out$Y1plot
-dataprep.out$Y0plot %*% employment.C.out$solution.w
-synth.tables <- synth.tab(dataprep.res = dataprep.out,synth.res = employment.C.out)
+dataprep.out$Y0plot %*% employment.TOTAL.out$solution.w
+synth.tables <- synth.tab(dataprep.res = dataprep.out,synth.res = employment.TOTAL.out)
 print(synth.tables$tab.pred)
 print(synth.tables$tab.v)
 test <- synth.tables$tab.w %>% filter(w.weights > 0)
 print(synth.tables$tab.w %>% filter(w.weights > 0))
 
-path.plot(synth.res = employment.C.out,
+path.plot(synth.res = employment.TOTAL.out,
           dataprep.res = dataprep.out,
-          tr.intake = 2011,
+          tr.intake = 2009,
           Ylab = c("Employment (thousand persons)"),
           Xlab = c("year"),
           Legend = c("Duisburg","Synthetic Duisburg"),
@@ -1033,10 +1057,10 @@ path.plot(synth.res = employment.C.out,
 
 
 
-data3 %>% filter(id %in% test$unit.numbers | geo == "DEA1") %>% ggplot(aes(x=time,colour=factor(id))) + geom_line(aes(y=employment.TOTAL)) +
+data3 %>% filter(id %in% test$unit.numbers | geo == "DEA1") %>% ggplot(aes(x = time, colour = factor(id))) + geom_line(aes(y = employment.TOTAL)) +
   gghighlight(geo == "DEA1")
-data3 %>% filter(country == "EL") %>% ggplot(aes(x=time,colour=factor(id))) + geom_line(aes(y=employment.TOTAL)) +
-  gghighlight(geo == "EL307")
+data4 %>% ggplot(aes(x = time,colour=factor(id))) + geom_line(aes(y = employment.TOTAL)) +
+  gghighlight(id %in% c(578:584)) + ylab("Employment (thousand persons)") + theme(legend.position = "none") + xlab("") + xlim(2000, 2016)
 data3 %>% filter(id == "69") %>% ggplot(aes(x=time)) + geom_line(aes(y=hours.worked.A,colour="hours.worked.A")) + 
   geom_line(aes(y=hours.worked.B_E,colour="hours.worked.B_E")) + geom_line(aes(y=hours.worked.C,colour="hours.worked.C")) + 
   geom_line(aes(y=hours.worked.F,colour="hours.worked.F")) + geom_line(aes(y=hours.worked.A,colour="hours.worked.A")) + 
