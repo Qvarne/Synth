@@ -660,7 +660,9 @@ data3 <- data3 %>% group_by(id) %>% mutate(pop.growth = ((population/dplyr::lead
   mutate(dependency.ratio_new = (demo_r_pjanaggr3.TOTAL - demo_r_pjanaggr3.Y15_64) / demo_r_pjanaggr3.Y15_64) %>%
   mutate(employment.B.D_E = employment.B_E - employment.C) %>%
   mutate(employment.J = employment.G_J - employment.G_I) %>% 
-  mutate(employment.G_I_capita = employment.G_I/population)
+  mutate(employment.G_I_capita = employment.G_I/population) %>%
+  mutate(employment.G_J_capita = employment.G_J/population)
+
   data3 %>% filter(geo == "DEA12") %>% select(time, employment.TOTAL, employment.TOTAL.lag1)
 # # Evaluate different variables' behavior over time
 # ggarrange(
@@ -867,7 +869,7 @@ se.fixef(plm.test)
 # 
 data3$employment.TOTAL_capita
  # Preparing data set for synthetic control
-data4 <- data3 %>% filter(time >= 2000 & time < 2018) %>% #filter(country == "EL") %>% 
+data4 <- data3 %>% filter(time >= 2000 & time < 2017) %>% #filter(country == "DE") %>% 
   distinct(id.NUTS.2, time, .keep_all= TRUE) %>%
   mutate(treatment = ifelse(time >= 2009, 1, 0)) %>%
   group_by(id.NUTS.2, treatment) %>%
@@ -877,6 +879,7 @@ data4 <- data3 %>% filter(time >= 2000 & time < 2018) %>% #filter(country == "EL
   # mutate(population = ifelse(time < 2009 & is.na(population), mean(population, na.rm = TRUE), population)) %>%
   # mutate(gva.TOTAL.growth = ifelse(time < 2009 & is.na(gva.TOTAL.growth), mean(gva.TOTAL.growth, na.rm = TRUE), gva.TOTAL.growth)) %>%
   # mutate(dependency.ratio_new = ifelse(time < 2009 & is.na(dependency.ratio_new), mean(dependency.ratio_new, na.rm = TRUE), dependency.ratio_new)) %>%
+  # mutate(population = ifelse(time < 2009 & is.na(population), mean(population, na.rm = TRUE), population)) %>%
   # mutate(coast = ifelse(is.na(coast) & mean(coast, na.rm = T) > 0, 1, coast)) %>%
   # mutate(gdp_share = ifelse(time < 2009 & is.na(gdp_share), mean(gdp_share, na.rm = TRUE), gdp_share)) %>%
   # mutate(population.density = ifelse(time < 2009 & is.na(population.density), mean(population.density, na.rm = TRUE), population.density)) %>% group_by(id.NUTS.2) %>%
@@ -886,15 +889,16 @@ data4 <- data3 %>% filter(time >= 2000 & time < 2018) %>% #filter(country == "EL
   # filter(!is.na(employment.B.D_E)) %>%
   # filter(!is.na(employment.C)) %>%
   # filter(!is.na(employment.F)) %>%
-  # filter(!is.na(employment.G_I)) %>%
+  # filter(!is.na(employment.G_J)) %>%
   # filter(!is.na(employment.J)) %>%
-  # filter(!is.na(employment.K)) %>%
+  # filter(!is.na(employment.K_N)) %>%
   # filter(!is.na(employment.L)) %>%
   # filter(!is.na(employment.M_N)) %>%
-  # filter(!is.na(employment.O_Q)) %>%
+  # filter(!is.na(employment.O_U)) %>%
   # filter(!is.na(employment.R_U)) %>%
   # filter(!is.na(employment.TOTAL_capita)) %>%
-  # filter(!is.na(employment.G_I_capita)) %>%
+  # filter(!is.na(employment.G_J_capita)) %>%
+  filter(!is.na(road_freight.NUTS.2)) %>%
   filter(!is.na(nuts.2)) %>%
   filter(!is.na(time)) %>%
   # filter(!is.na(gva.B_E_F_share)) %>%
@@ -903,7 +907,7 @@ data4 <- data3 %>% filter(time >= 2000 & time < 2018) %>% #filter(country == "EL
   # filter(!is.na(gva.TOTAL_capita)) %>%
   # filter(!is.na(dependency.ratio_new)) %>%
   # filter(!is.na(gva.TOTAL.growth)) %>%
-  filter(!is.na(maritime_freight)) %>%
+  # filter(!is.na(maritime_freight)) %>%
   # filter(!is.na(coast)) %>%
   # filter(!is.na(port)) %>%
   # filter(!is.na(metro)) %>%
@@ -912,20 +916,20 @@ data4 <- data3 %>% filter(time >= 2000 & time < 2018) %>% #filter(country == "EL
   # filter(!is.na(population.density)) %>%
   as.data.frame() %>% 
   select(c(
-           # "employment.TOTAL", 
+           # "employment.TOTAL",
            # "employment.A",
            # "employment.B.D_E",
            # "employment.C",
            # "employment.F",
-           # "employment.G_I",
+           # "employment.G_J",
            # "employment.J",
            # "employment.K",
            # "employment.L",
-           # "employment.M_N",
-           # "employment.O_Q",
+           # "employment.K_N",
+           # "employment.O_U",
            # "employment.R_U",
            # "employment.TOTAL_capita",
-           # "employment.G_I_capita",
+           # "employment.G_J_capita",
            "id.NUTS.2",
            "time",
            "nuts.2",
@@ -936,18 +940,21 @@ data4 <- data3 %>% filter(time >= 2000 & time < 2018) %>% #filter(country == "EL
            # "metro",
            # "gva.TOTAL_capita",
            # "gva.TOTAL.growth",
-           # # "trade.mark",
+           # # # "trade.mark",
            # "urban"
-           "maritime_freight"
+           "road_freight.NUTS.2"
+           # "maritime_freight"
            # "population.density",
            # "gdp_share"
            )) %>%
   distinct(id.NUTS.2, time, .keep_all= TRUE) %>% select(id.NUTS.2, time, everything())
 data5 <- make.pbalanced(data4, balance.type = "shared.individuals")
-data5 %>% filter(nuts.2 == "EL307")
-summary(data5$employment.G_I)
-# 
-lm.test <- data5 %>% lm(log(maritime_freight) ~
+data5 %>% filter(nuts.2 == "DEA12")
+summary(data5$time)
+
+data3 %>% filter(country == "DE") %>% select(employment.O_U) %>% summary()
+
+lm.test <- data5 %>% lm(log(employment.TOTAL) ~
                                                                 # population.density +
                                                                 population +
                                                                 coast +
@@ -968,8 +975,8 @@ stargazer(lm.test.robust)
 
 
 
-plm.test <- data4 %>% distinct(id.NUTS.2, time, .keep_all= TRUE) %>%
-  plm(log(maritime_freight) ~
+plm.test <- data4 %>% distinct(id, time, .keep_all= TRUE) %>%
+  plm(log(employment.TOTAL) ~
         # population.density +
         population +
         coast +
@@ -983,7 +990,7 @@ plm.test <- data4 %>% distinct(id.NUTS.2, time, .keep_all= TRUE) %>%
         # pop.growth +
         # gdp_share +
         gva.TOTAL.growth,
-      index = c("id.NUTS.2","time"), model="within", effect="twoways", data = .)
+      index = c("id","time"), model="within", effect="twoways", data = .)
 plm.test %>% summary() %>% print() %>% bptest()
 plm.test.robust <- plm.test %>%coeftest(., vcov=vcovHC(.,type="HC0",cluster="group")) %>% print
 stargazer(plm.test.robust)
@@ -992,13 +999,14 @@ se.fixef(plm.test)
 
 
 
-# data5 %>% filter(id.NUTS.2 == "403")
-data5 %>% filter(nuts.2 == "EL30")
+# data5 %>% filter(id == "403")
+data5 %>% filter(nuts.2 == "DEA1")
 
 b <- unique(data5$id.NUTS.2) 
 
+c <- b[!b %in%  c(69)]
 # c <- b[!b %in%  c(402:416)]
-c <- b[!b %in%  c(90)]
+# c <- b[!b %in%  c(578:584)]
 
 # Run synthetic control estimation and plot results
 dataprep.out<-
@@ -1007,59 +1015,59 @@ dataprep.out<-
     predictors = c(
       # population.density +
       # "population",
-      #   "coast", 
-      #   # "urban",
+      #   "coast",
+      #   "urban",
       #   # employment.A.lag1 +
-      #   "port",
+        # "port",
       #   # gva.B_E_F_share +
-      #   "dependency.ratio_new",
-      #   "metro",
-      #   "gva.TOTAL_capita",
-      #   # pop.growth +
+        # "dependency.ratio_new",
+        # "metro",
+        # "gva.TOTAL_capita",
+        # pop.growth +
       #   # gdp_share +
-      #   "gva.TOTAL.growth"
+        # "gva.TOTAL.growth"
                    ),
     predictors.op = "mean",
-    dependent = "maritime_freight",
+    dependent = "road_freight.NUTS.2",
     unit.variable = c("id.NUTS.2"),
     time.variable = c("time"),
     special.predictors = list(
-      list("maritime_freight", 2000, "mean"),
-      list("maritime_freight", 2001, "mean"),
-      list("maritime_freight", 2002, "mean"),
-      list("maritime_freight", 2003, "mean"),
-      list("maritime_freight", 2004, "mean"),
-      list("maritime_freight", 2005, "mean"),
-      list("maritime_freight", 2006, "mean"),
-      list("maritime_freight", 2007, "mean"),
-      list("maritime_freight", 2008, "mean")
-      # list("maritime_freight", 2009, "mean"),
-      # list("maritime_freight", 2010, "mean")
+      list("road_freight.NUTS.2", 2000, "mean"),
+      list("road_freight.NUTS.2", 2001, "mean"),
+      list("road_freight.NUTS.2", 2002, "mean"),
+      list("road_freight.NUTS.2", 2003, "mean"),
+      list("road_freight.NUTS.2", 2004, "mean"),
+      list("road_freight.NUTS.2", 2005, "mean"),
+      list("road_freight.NUTS.2", 2006, "mean"),
+      list("road_freight.NUTS.2", 2007, "mean"),
+      list("road_freight.NUTS.2", 2008, "mean"),
+      list("road_freight.NUTS.2", 2009, "mean"),
+      list("road_freight.NUTS.2", 2010, "mean")
     ),
-    treatment.identifier = 90,
+    treatment.identifier = 69,
     controls.identifier = c,
-    time.predictors.prior = c(2000:2008),
-    time.optimize.ssr = c(2000:2008),
+    time.predictors.prior = c(2000:2010),
+    time.optimize.ssr = c(2000:2010),
     unit.names.variable = "nuts.2",
-    time.plot = 2000:2017
+    time.plot = 2000:2016
   )
 
 
-maritime_freight.out <- synth(dataprep.out) # verbose = TRUE, optimxmethod = "All")
+road_freight.NUTS.2.out <- synth(dataprep.out) # verbose = TRUE, optimxmethod = "All")
 dataprep.out$Y1plot
-dataprep.out$Y0plot %*% maritime_freight.out$solution.w
-synth.tables <- synth.tab(dataprep.res = dataprep.out,synth.res = maritime_freight.out)
+dataprep.out$Y0plot %*% road_freight.NUTS.2.out$solution.w
+synth.tables <- synth.tab(dataprep.res = dataprep.out,synth.res = road_freight.NUTS.2.out)
 print(synth.tables$tab.pred)
 print(synth.tables$tab.v)
 test <- synth.tables$tab.w %>% filter(w.weights > 0)
 print(synth.tables$tab.w %>% filter(w.weights > 0))
 
-path.plot(synth.res = maritime_freight.out,
+path.plot(synth.res = road_freight.NUTS.2.out,
           dataprep.res = dataprep.out,
-          tr.intake = 2009,
-          Ylab = c("Maritime freight (thousand tonnes)"),
+          tr.intake = 2011,
+          Ylab = c("Road freight (thousand tonnes)"),
           Xlab = c("year"),
-          Legend = c("Attica","Synthetic Attica"),
+          Legend = c("Duisburg","Synthetic Duisburg"),
 )
 xtable(synth.tables$tab.v, digits = 3)
 data4$employ
