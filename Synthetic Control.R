@@ -661,9 +661,19 @@ data3 <- data3 %>% group_by(id) %>% mutate(pop.growth = ((population/dplyr::lead
   mutate(employment.B.D_E = employment.B_E - employment.C) %>%
   mutate(employment.J = employment.G_J - employment.G_I) %>% 
   mutate(employment.G_I_capita = employment.G_I/population) %>%
-  mutate(employment.G_J_capita = employment.G_J/population)
+  mutate(employment.G_J_capita = employment.G_J/population) %>% group_by(country, time) %>% mutate(road_freight.country = sum(road_freight, na.rm = T)) %>% 
+  mutate(employment.TOTAL.country = sum(employment.TOTAL, na.rm = T)) %>% group_by()
 
-  data3 %>% filter(geo == "DEA12") %>% select(time, employment.TOTAL, employment.TOTAL.lag1)
+
+data3 %>% distinct(country, time, employment.TOTAL.country) %>% arrange(country, time) %>% group_by(country) %>% filter(!is.na(employment.TOTAL.country)) %>% 
+  filter(!employment.TOTAL.country == 0) %>% filter(time >= 2000 & time <= 2016) %>% make.pbalanced(balance.type = "shared.individuals") %>%
+  ggplot(aes(x = time, employment.TOTAL.country, color = factor(country))) + geom_line() + ylab("Employment (thousand persons)") + xlab("") + 
+  labs(color = "Country code") #+ geom_vline(xintercept = 2011, linetype = "dotted")
+
+test <- data3 %>% select(geo, time, road_freight, country) %>% filter(time %in% c(2000:2016)) %>% group_by(geo) %>% filter(!is.na(road_freight)) %>%
+  make.pbalanced(balance.type = "shared.individuals") %>% arrange(geo, time)
+nlevels(factor(test$country))
+
 # # Evaluate different variables' behavior over time
 # ggarrange(
 #   data3 %>% filter(id == "584") %>% distinct(id, time, .keep_all= TRUE) %>% 
@@ -778,48 +788,48 @@ data3 <- data3 %>% group_by(id) %>% mutate(pop.growth = ((population/dplyr::lead
 #   make.pbalanced(balance.type = "shared.individuals") %>%
 #   as.data.frame() %>% arrange(id, time)
 # 
-# # Fit regression to justify predictor variable selection
-lm.test <- data %>% filter(time >= 2000 & time < 2017) %>% lm(log(employment.TOTAL) ~
-                          # population.density +
-                          population +
-                          coast +
-                          urban +
-                          # employment.TOTAL.lag1 +
-                          port +
-                          # gva.B_E_F_share +
-                          dependency.ratio_new +
-                          metro +
-                          gva.TOTAL_capita +
-                          # pop.growth +
-                          # gdp_share +
-                          gva.TOTAL.growth,
-                        .)
-lm.test %>% summary() %>% print() %>% bptest()
-lm.test.robust <- lm.test %>% coeftest(vcov = vcovHC(.)) %>% print()
-stargazer(lm.test.robust)
-# test.complete %>% lmrob(employment.TOTAL ~ population + population.density + coast + urban + port + metro + gva.TOTAL_capita + gva.B_E_F_share + trade.mark, .) %>% summary()
-
-plm.test <- data4 %>% distinct(id, time, .keep_all= TRUE) %>%
-  plm(log(employment.TOTAL) ~
-        # population.density +
-        population +
-        coast +
-        urban +
-        # employment.TOTAL.lag1 +
-        port +
-        # gva.B_E_F_share +
-        dependency.ratio_new +
-        metro +
-        gva.TOTAL_capita +
-        # pop.growth +
-        # gdp_share +
-        gva.TOTAL.growth,
-      index = c("id","time"), model="within", effect="twoways", data = .)
-plm.test %>% summary() %>% print() %>% bptest()
-plm.test.robust <- plm.test %>%coeftest(., vcov=vcovHC(.,type="HC0",cluster="group")) %>% print
-stargazer(plm.test.robust)
-mean(fixef(plm.test))
-se.fixef(plm.test)
+# # # Fit regression to justify predictor variable selection
+# lm.test <- data %>% filter(time >= 2000 & time < 2017) %>% lm(log(employment.TOTAL) ~
+#                           # population.density +
+#                           population +
+#                           coast +
+#                           urban +
+#                           # employment.TOTAL.lag1 +
+#                           port +
+#                           # gva.B_E_F_share +
+#                           dependency.ratio_new +
+#                           metro +
+#                           gva.TOTAL_capita +
+#                           # pop.growth +
+#                           # gdp_share +
+#                           gva.TOTAL.growth,
+#                         .)
+# lm.test %>% summary() %>% print() %>% bptest()
+# lm.test.robust <- lm.test %>% coeftest(vcov = vcovHC(.)) %>% print()
+# stargazer(lm.test.robust)
+# # test.complete %>% lmrob(employment.TOTAL ~ population + population.density + coast + urban + port + metro + gva.TOTAL_capita + gva.B_E_F_share + trade.mark, .) %>% summary()
+# 
+# plm.test <- data4 %>% distinct(id, time, .keep_all= TRUE) %>%
+#   plm(log(employment.TOTAL) ~
+#         # population.density +
+#         population +
+#         coast +
+#         urban +
+#         # employment.TOTAL.lag1 +
+#         port +
+#         # gva.B_E_F_share +
+#         dependency.ratio_new +
+#         metro +
+#         gva.TOTAL_capita +
+#         # pop.growth +
+#         # gdp_share +
+#         gva.TOTAL.growth,
+#       index = c("id","time"), model="within", effect="twoways", data = .)
+# plm.test %>% summary() %>% print() %>% bptest()
+# plm.test.robust <- plm.test %>%coeftest(., vcov=vcovHC(.,type="HC0",cluster="group")) %>% print
+# stargazer(plm.test.robust)
+# mean(fixef(plm.test))
+# se.fixef(plm.test)
 # 
 # summary(data4$time)
 # # Carry out matching using the match MatchIt package
@@ -870,9 +880,9 @@ se.fixef(plm.test)
 data3$employment.TOTAL_capita
  # Preparing data set for synthetic control
 data4 <- data3 %>% filter(time >= 2000 & time < 2017) %>% #filter(country == "DE") %>% 
-  distinct(id.NUTS.2, time, .keep_all= TRUE) %>%
+  distinct(id, time, .keep_all= TRUE) %>%
   mutate(treatment = ifelse(time >= 2009, 1, 0)) %>%
-  group_by(id.NUTS.2, treatment) %>%
+  group_by(id, treatment) %>%
   # mutate(gva.B_E_F_share = ifelse(time < 2009 & is.na(gva.B_E_F_share), mean(gva.B_E_F_share, na.rm = TRUE), gva.B_E_F_share)) %>%
   # mutate(trade.mark = ifelse(time < 2009 & is.na(trade.mark), mean(trade.mark, na.rm = TRUE), trade.mark)) %>%
   # mutate(gva.TOTAL_capita = ifelse(time < 2009 & is.na(gva.TOTAL_capita), mean(gva.TOTAL_capita, na.rm = TRUE), gva.TOTAL_capita)) %>%
@@ -882,8 +892,8 @@ data4 <- data3 %>% filter(time >= 2000 & time < 2017) %>% #filter(country == "DE
   # mutate(population = ifelse(time < 2009 & is.na(population), mean(population, na.rm = TRUE), population)) %>%
   # mutate(coast = ifelse(is.na(coast) & mean(coast, na.rm = T) > 0, 1, coast)) %>%
   # mutate(gdp_share = ifelse(time < 2009 & is.na(gdp_share), mean(gdp_share, na.rm = TRUE), gdp_share)) %>%
-  # mutate(population.density = ifelse(time < 2009 & is.na(population.density), mean(population.density, na.rm = TRUE), population.density)) %>% group_by(id.NUTS.2) %>%
-  filter(!is.na(id.NUTS.2)) %>%
+  # mutate(population.density = ifelse(time < 2009 & is.na(population.density), mean(population.density, na.rm = TRUE), population.density)) %>% group_by(id) %>%
+  filter(!is.na(id)) %>%
   # filter(!is.na(employment.TOTAL)) %>%
   # filter(!is.na(employment.A)) %>%
   # filter(!is.na(employment.B.D_E)) %>%
@@ -898,8 +908,8 @@ data4 <- data3 %>% filter(time >= 2000 & time < 2017) %>% #filter(country == "DE
   # filter(!is.na(employment.R_U)) %>%
   # filter(!is.na(employment.TOTAL_capita)) %>%
   # filter(!is.na(employment.G_J_capita)) %>%
-  filter(!is.na(road_freight.NUTS.2)) %>%
-  filter(!is.na(nuts.2)) %>%
+  filter(!is.na(road_freight)) %>%
+  filter(!is.na(geo)) %>%
   filter(!is.na(time)) %>%
   # filter(!is.na(gva.B_E_F_share)) %>%
   # filter(!is.na(population)) %>%
@@ -930,9 +940,9 @@ data4 <- data3 %>% filter(time >= 2000 & time < 2017) %>% #filter(country == "DE
            # "employment.R_U",
            # "employment.TOTAL_capita",
            # "employment.G_J_capita",
-           "id.NUTS.2",
+           "id",
            "time",
-           "nuts.2",
+           "geo",
            # "population",
            # "coast",
            # "port",
@@ -942,70 +952,70 @@ data4 <- data3 %>% filter(time >= 2000 & time < 2017) %>% #filter(country == "DE
            # "gva.TOTAL.growth",
            # # # "trade.mark",
            # "urban"
-           "road_freight.NUTS.2"
+           "road_freight"
            # "maritime_freight"
            # "population.density",
            # "gdp_share"
            )) %>%
-  distinct(id.NUTS.2, time, .keep_all= TRUE) %>% select(id.NUTS.2, time, everything())
+  distinct(id, time, .keep_all= TRUE) %>% select(id, time, everything())
 data5 <- make.pbalanced(data4, balance.type = "shared.individuals")
-data5 %>% filter(nuts.2 == "DEA12")
+data5 %>% filter(geo == "DEA12")
 summary(data5$time)
 
 data3 %>% filter(country == "DE") %>% select(employment.O_U) %>% summary()
 
-lm.test <- data5 %>% lm(log(employment.TOTAL) ~
-                                                                # population.density +
-                                                                population +
-                                                                coast +
-                                                                urban +
-                                                                # employment.A.lag1 +
-                                                                port +
-                                                                # gva.B_E_F_share +
-                                                                dependency.ratio_new +
-                                                                metro +
-                                                                gva.TOTAL_capita +
-                                                                # pop.growth +
-                                                                # gdp_share +
-                                                                gva.TOTAL.growth,
-                                                              .)
-lm.test %>% summary() %>% print() %>% bptest()
-lm.test.robust <- lm.test %>% coeftest(vcov = vcovHC(.)) %>% print()
-stargazer(lm.test.robust)
-
-
-
-plm.test <- data4 %>% distinct(id, time, .keep_all= TRUE) %>%
-  plm(log(employment.TOTAL) ~
-        # population.density +
-        population +
-        coast +
-        urban +
-        # employment.A.lag1 +
-        port +
-        # gva.B_E_F_share +
-        dependency.ratio_new +
-        metro +
-        gva.TOTAL_capita +
-        # pop.growth +
-        # gdp_share +
-        gva.TOTAL.growth,
-      index = c("id","time"), model="within", effect="twoways", data = .)
-plm.test %>% summary() %>% print() %>% bptest()
-plm.test.robust <- plm.test %>%coeftest(., vcov=vcovHC(.,type="HC0",cluster="group")) %>% print
-stargazer(plm.test.robust)
-mean(fixef(plm.test))
-se.fixef(plm.test)
+# lm.test <- data5 %>% lm(log(employment.TOTAL) ~
+#                                                                 # population.density +
+#                                                                 population +
+#                                                                 coast +
+#                                                                 urban +
+#                                                                 # employment.A.lag1 +
+#                                                                 port +
+#                                                                 # gva.B_E_F_share +
+#                                                                 dependency.ratio_new +
+#                                                                 metro +
+#                                                                 gva.TOTAL_capita +
+#                                                                 # pop.growth +
+#                                                                 # gdp_share +
+#                                                                 gva.TOTAL.growth,
+#                                                               .)
+# lm.test %>% summary() %>% print() %>% bptest()
+# lm.test.robust <- lm.test %>% coeftest(vcov = vcovHC(.)) %>% print()
+# stargazer(lm.test.robust)
+# 
+# 
+# 
+# plm.test <- data4 %>% distinct(id, time, .keep_all= TRUE) %>%
+#   plm(log(employment.TOTAL) ~
+#         # population.density +
+#         population +
+#         coast +
+#         urban +
+#         # employment.A.lag1 +
+#         port +
+#         # gva.B_E_F_share +
+#         dependency.ratio_new +
+#         metro +
+#         gva.TOTAL_capita +
+#         # pop.growth +
+#         # gdp_share +
+#         gva.TOTAL.growth,
+#       index = c("id","time"), model="within", effect="twoways", data = .)
+# plm.test %>% summary() %>% print() %>% bptest()
+# plm.test.robust <- plm.test %>%coeftest(., vcov=vcovHC(.,type="HC0",cluster="group")) %>% print
+# stargazer(plm.test.robust)
+# mean(fixef(plm.test))
+# se.fixef(plm.test)
 
 
 
 # data5 %>% filter(id == "403")
-data5 %>% filter(nuts.2 == "DEA1")
+data5 %>% filter(geo == "DEA1")
 
-b <- unique(data5$id.NUTS.2) 
+b <- unique(data5$id) 
 
-c <- b[!b %in%  c(69)]
-# c <- b[!b %in%  c(402:416)]
+# c <- b[!b %in%  c(69)]
+c <- b[!b %in%  c(402:416)]
 # c <- b[!b %in%  c(578:584)]
 
 # Run synthetic control estimation and plot results
@@ -1028,41 +1038,41 @@ dataprep.out<-
         # "gva.TOTAL.growth"
                    ),
     predictors.op = "mean",
-    dependent = "road_freight.NUTS.2",
-    unit.variable = c("id.NUTS.2"),
+    dependent = "road_freight",
+    unit.variable = c("id"),
     time.variable = c("time"),
     special.predictors = list(
-      list("road_freight.NUTS.2", 2000, "mean"),
-      list("road_freight.NUTS.2", 2001, "mean"),
-      list("road_freight.NUTS.2", 2002, "mean"),
-      list("road_freight.NUTS.2", 2003, "mean"),
-      list("road_freight.NUTS.2", 2004, "mean"),
-      list("road_freight.NUTS.2", 2005, "mean"),
-      list("road_freight.NUTS.2", 2006, "mean"),
-      list("road_freight.NUTS.2", 2007, "mean"),
-      list("road_freight.NUTS.2", 2008, "mean"),
-      list("road_freight.NUTS.2", 2009, "mean"),
-      list("road_freight.NUTS.2", 2010, "mean")
+      list("road_freight", 2000, "mean"),
+      list("road_freight", 2001, "mean"),
+      list("road_freight", 2002, "mean"),
+      list("road_freight", 2003, "mean"),
+      # list("road_freight", 2004, "mean"),
+      list("road_freight", 2005, "mean"),
+      list("road_freight", 2006, "mean"),
+      list("road_freight", 2007, "mean"),
+      list("road_freight", 2008, "mean"),
+      list("road_freight", 2009, "mean"),
+      list("road_freight", 2010, "mean")
     ),
-    treatment.identifier = 69,
+    treatment.identifier = 403,
     controls.identifier = c,
     time.predictors.prior = c(2000:2010),
     time.optimize.ssr = c(2000:2010),
-    unit.names.variable = "nuts.2",
+    unit.names.variable = "geo",
     time.plot = 2000:2016
   )
 
 
-road_freight.NUTS.2.out <- synth(dataprep.out) # verbose = TRUE, optimxmethod = "All")
+road_freight.out <- synth(dataprep.out) # verbose = TRUE, optimxmethod = "All")
 dataprep.out$Y1plot
-dataprep.out$Y0plot %*% road_freight.NUTS.2.out$solution.w
-synth.tables <- synth.tab(dataprep.res = dataprep.out,synth.res = road_freight.NUTS.2.out)
+dataprep.out$Y0plot %*% road_freight.out$solution.w
+synth.tables <- synth.tab(dataprep.res = dataprep.out,synth.res = road_freight.out)
 print(synth.tables$tab.pred)
 print(synth.tables$tab.v)
 test <- synth.tables$tab.w %>% filter(w.weights > 0)
 print(synth.tables$tab.w %>% filter(w.weights > 0))
 
-path.plot(synth.res = road_freight.NUTS.2.out,
+path.plot(synth.res = road_freight.out,
           dataprep.res = dataprep.out,
           tr.intake = 2011,
           Ylab = c("Road freight (thousand tonnes)"),
@@ -1070,17 +1080,16 @@ path.plot(synth.res = road_freight.NUTS.2.out,
           Legend = c("Duisburg","Synthetic Duisburg"),
 )
 xtable(synth.tables$tab.v, digits = 3)
-data4$employ
 
-data3 %>% filter(id %in% test$unit.numbers | geo == "DEA1") %>% ggplot(aes(x = time, colour = factor(id))) + geom_line(aes(y = employment.TOTAL)) +
-  gghighlight(geo == "DEA1")
-data4 %>% ggplot(aes(x = time,colour=factor(id))) + geom_line(aes(y = employment.TOTAL)) +
-  gghighlight(id %in% c(578:583)) + ylab("Employment (thousand persons)") + theme(legend.position = "none") + xlab("") + xlim(2000, 2016)
-data3 %>% filter(id == "69") %>% ggplot(aes(x=time)) + geom_line(aes(y=hours.worked.A,colour="hours.worked.A")) + 
-  geom_line(aes(y=hours.worked.B_E,colour="hours.worked.B_E")) + geom_line(aes(y=hours.worked.C,colour="hours.worked.C")) + 
-  geom_line(aes(y=hours.worked.F,colour="hours.worked.F")) + geom_line(aes(y=hours.worked.A,colour="hours.worked.A")) + 
-  geom_line(aes(y=hours.worked.G_I,colour="hours.worked.G_I")) + geom_line(aes(y=hours.worked.G_J,colour="hours.worked.G_J")) + 
-  geom_line(aes(y=hours.worked.J,colour="hours.worked.J")) + geom_line(aes(y=hours.worked.K_N,colour="hours.worked.K_N")) + 
-  geom_line(aes(y=hours.worked.K,colour="hours.worked.K")) + geom_line(aes(y=hours.worked.L,colour="hours.worked.L")) + 
-  geom_line(aes(y=hours.worked.M_N,colour="hours.worked.M_N")) + geom_line(aes(y=hours.worked.O_Q,colour="hours.worked.O_Q")) + 
-  geom_line(aes(y=hours.worked.O_U,colour="hours.worked.O_U")) + geom_line(aes(y=hours.worked.R_U,colour="hours.worked.R_U"))
+# data3 %>% filter(id %in% test$unit.numbers | geo == "DEA1") %>% ggplot(aes(x = time, colour = factor(id))) + geom_line(aes(y = employment.TOTAL)) +
+#   gghighlight(geo == "DEA1")
+# data4 %>% ggplot(aes(x = time,colour=factor(id))) + geom_line(aes(y = employment.TOTAL)) +
+#   gghighlight(id %in% c(578:583)) + ylab("Employment (thousand persons)") + theme(legend.position = "none") + xlab("") + xlim(2000, 2016)
+# data3 %>% filter(id == "69") %>% ggplot(aes(x=time)) + geom_line(aes(y=hours.worked.A,colour="hours.worked.A")) + 
+#   geom_line(aes(y=hours.worked.B_E,colour="hours.worked.B_E")) + geom_line(aes(y=hours.worked.C,colour="hours.worked.C")) + 
+#   geom_line(aes(y=hours.worked.F,colour="hours.worked.F")) + geom_line(aes(y=hours.worked.A,colour="hours.worked.A")) + 
+#   geom_line(aes(y=hours.worked.G_I,colour="hours.worked.G_I")) + geom_line(aes(y=hours.worked.G_J,colour="hours.worked.G_J")) + 
+#   geom_line(aes(y=hours.worked.J,colour="hours.worked.J")) + geom_line(aes(y=hours.worked.K_N,colour="hours.worked.K_N")) + 
+#   geom_line(aes(y=hours.worked.K,colour="hours.worked.K")) + geom_line(aes(y=hours.worked.L,colour="hours.worked.L")) + 
+#   geom_line(aes(y=hours.worked.M_N,colour="hours.worked.M_N")) + geom_line(aes(y=hours.worked.O_Q,colour="hours.worked.O_Q")) + 
+#   geom_line(aes(y=hours.worked.O_U,colour="hours.worked.O_U")) + geom_line(aes(y=hours.worked.R_U,colour="hours.worked.R_U"))
